@@ -37,14 +37,18 @@
     "rates",
     "inflation",
     "Lagarde",
-    "Powell",
     "Banque de France",
     "PIB",
     "GDP",
     "emploi",
     "jobs",
     "récession",
-    "recession"
+    "recession",
+    "Jerome Powell",
+    "taux directeurs",
+    "interest rate",
+    "interest rates",
+    "Christine Lagarde"
    ]
   },
   {
@@ -53,7 +57,8 @@
    "query_en": "bitcoin",
    "match": [
     "Bitcoin",
-    "BTC"
+    "BTC",
+    "bitcoins"
    ]
   },
   {
@@ -69,6 +74,9 @@
     "Ripple",
     "altcoin",
     "altcoins"
+   ],
+   "exclure": [
+    "\\b(WTA|ATP|tennis|match|Sierra|Open)\\b"
    ]
   },
   {
@@ -87,7 +95,14 @@
     "Binance",
     "Coinbase",
     "tokenisation",
-    "tokenization"
+    "tokenization",
+    "finance décentralisée",
+    "decentralized finance",
+    "ETFs",
+    "tokenisation"
+   ],
+   "exclure": [
+    "\\bdéfis?\\b"
    ]
   },
   {
@@ -109,7 +124,8 @@
     "PayPal USD",
     "PYUSD",
     "DAI",
-    "USDe"
+    "USDe",
+    "euro digital"
    ]
   },
   {
@@ -133,7 +149,10 @@
     "dollar",
     "devises",
     "forex",
-    "yen"
+    "yen",
+    "dollars",
+    "or noir",
+    "métaux"
    ]
   }
  ],
@@ -163,7 +182,9 @@
    "\\b(alternatives?|comparatif|comparison|on a testé|review|avis)\\b",
    "^\\s*(how to|comment|tuto|guide|tutorial|qu'est-ce que|what is)\\b",
    "^\\s*(\\d+|trois|quatre|cinq|six|sept|huit|neuf|dix|three|four|five|seven|eight|nine|ten)\\s+(raisons?|reasons?|stocks?|actions?|cryptos?|coins?|tokens?|things?|choses?|signes?|signs?|valeurs?|titres?|conseils?|tips?)\\b",
-   "\\b(horoscope|casino|betting|paris sportifs|loterie|lottery|trading bot|robot de trading|signal(s)? de trading|copy trading)\\b"
+   "\\b(horoscope|casino|betting|paris sportifs|loterie|lottery|trading bot|robot de trading|signal(s)? de trading|copy trading)\\b",
+   "\\b(deadline alert|class action|shareholder alert|investors? (who|with) (lost|losses)|seasonal returns|prediction market|current price of|price on \\w+\\.? \\d)",
+   "\\((NASDAQ|NYSE|AMEX|OTC|TSX|LSE)\\s?:"
   ],
   "sources_exclues": [
    "motley fool",
@@ -211,7 +232,14 @@
    "thenewscrypto",
    "crypto daily",
    "cryptodaily",
-   "benzinga"
+   "benzinga",
+   "robinhood",
+   "chartmill",
+   "national law review",
+   "tennismajors",
+   "lejournaldici",
+   "jones county",
+   "stocktwits"
   ]
  }
 }

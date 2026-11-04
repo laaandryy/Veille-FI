@@ -264,7 +264,7 @@
 
 <footer class="wrap">
   Généré automatiquement chaque jour à 05:00 UTC par la tâche planifiée <b>veille</b> à partir de <a href="actifs.csv">actifs.csv</a>.
-  Sources : Yahoo Finance (cours), CoinGecko (crypto), DefiLlama (stablecoins, TVL), alternative.me (Fear &amp; Greed), Google News (actualités).
+  Sources : Yahoo Finance, BCE, CryptoCompare et Stooq (cours), CoinGecko (crypto), DefiLlama (stablecoins, TVL), alternative.me (Fear &amp; Greed), Google News (actualités).
   Graphes : <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts</a>.
   Informations fournies à titre indicatif, sans valeur de conseil en investissement.
 </footer>
@@ -382,19 +382,19 @@ const DATA = /*__DATA__*/null;
 
   /* Carte graphe d'un actif (CAC 40, S&P 500, explorateur) */
   const state = { feat: {}, explorer: store.get("vfi-explorer") || "", expP: "1A", log: false };
-  function assetPoints(a, p) { return p === "5J" ? (a.intraday || []) : cut(a.daily, PERIODS[p]); }
+  function assetPoints(a, p) { return p === "5J" ? (a.intraday && a.intraday.length > 5 ? a.intraday : cut(a.daily, 7)) : cut(a.daily, PERIODS[p]); }
   function drawAssetCard(key, el, a, p, tall, withPicker) {
     const pts = assetPoints(a, p);
     const fmt = assetFmt(a);
     const picker = withPicker ? `<select class="pick" id="exp-pick" aria-label="Actif">${[...new Set(assets.map((x) => x.category))].map((c) =>
       `<optgroup label="${esc(c)}">${assets.filter((x) => x.category === c).map((x) => `<option value="${esc(x.symbol)}"${x.symbol === a.symbol ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</optgroup>`).join("")}</select>` : `<h2>${esc(a.name)}</h2>`;
-    el.innerHTML = `<div class="card-head"><div>${picker}<div class="cat">${esc(a.category)} · ${esc(a.symbol)}${a.stale ? " · données de la veille" : ""}</div></div>
+    el.innerHTML = `<div class="card-head"><div>${picker}<div class="cat">${esc(a.category)} · ${esc(a.symbol)}${a.source ? " · " + esc(a.source) : ""}${a.stale ? " · données du passage précédent" : ""}</div></div>
         <div class="ctrls">${segHtml(Object.keys(PERIODS), p)}${withPicker ? `<button class="toggle" id="log" aria-pressed="${state.log}" title="Échelle logarithmique">Log</button>` : ""}</div></div>
       <div class="price-big"><span class="num" data-live-price="${esc(a.symbol)}">${esc(fmt(a.price))}</span>
         <span data-live-chg="${esc(a.symbol)}">${chg(a.perf?.["1J"])} <small class="src">${a.live ? "24 h" : "1 jour"}</small></span>
         <span class="src">${esc(p)} : ${chg(periodPerf(pts))}</span></div>
       <div class="chart${tall ? " tall" : ""}"></div>`;
-    mount(key, el.querySelector(".chart"), { points: pts, fmt, log: withPicker && state.log, symbol: a.symbol, intraday: p === "5J" });
+    mount(key, el.querySelector(".chart"), { points: pts, fmt, log: withPicker && state.log, symbol: a.symbol, intraday: p === "5J" && typeof (pts[0] || [])[0] === "number" });
     el.querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => {
       if (withPicker) state.expP = b.dataset.p; else state.feat[a.symbol] = b.dataset.p;
       drawAssetCard(key, el, a, b.dataset.p, tall, withPicker);
@@ -411,7 +411,7 @@ const DATA = /*__DATA__*/null;
   }
   function showExplorer(sym, scroll) {
     const a = bySym[sym] || assets.find((x) => !featured.includes(x)) || assets[0];
-    if (!a) return;
+    if (!a) { $("explorer").innerHTML = '<p class="empty">Cours indisponibles lors du dernier passage : ils reviendront au prochain.</p>'; return; }
     state.explorer = a.symbol; store.set("vfi-explorer", a.symbol);
     drawAssetCard("explorer", $("explorer"), a, state.expP, true, true);
     if (scroll) $("explorer").scrollIntoView({ behavior: "smooth", block: "center" });

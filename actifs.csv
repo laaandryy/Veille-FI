@@ -1,16 +1,16 @@
-Nom;Symbole Yahoo;Catégorie;CoinGecko (prix en direct)
-CAC 40;^FCHI;Indices;
-S&P 500;^GSPC;Indices;
-Nasdaq 100;^NDX;Indices;
-Euro Stoxx 50;^STOXX50E;Indices;
-DAX;^GDAXI;Indices;
-Bitcoin;BTC-USD;Crypto;bitcoin
-Ethereum;ETH-USD;Crypto;ethereum
-Solana;SOL-USD;Crypto;solana
-XRP;XRP-USD;Crypto;ripple
-EUR/USD;EURUSD=X;Devises;
-EUR/GBP;EURGBP=X;Devises;
-EUR/CHF;EURCHF=X;Devises;
-Or (once);GC=F;Matières premières;
-Argent (once);SI=F;Matières premières;
-Pétrole Brent;BZ=F;Matières premières;
+Nom;Symbole Yahoo;Catégorie;CoinGecko (prix en direct);Stooq (secours)
+CAC 40;^FCHI;Indices;;^cac
+S&P 500;^GSPC;Indices;;^spx
+Nasdaq 100;^NDX;Indices;;^ndx
+Euro Stoxx 50;^STOXX50E;Indices;;
+DAX;^GDAXI;Indices;;^dax
+Bitcoin;BTC-USD;Crypto;bitcoin;
+Ethereum;ETH-USD;Crypto;ethereum;
+Solana;SOL-USD;Crypto;solana;
+XRP;XRP-USD;Crypto;ripple;
+EUR/USD;EURUSD=X;Devises;;
+EUR/GBP;EURGBP=X;Devises;;
+EUR/CHF;EURCHF=X;Devises;;
+Or (once);GC=F;Matières premières;;gc.f
+Argent (once);SI=F;Matières premières;;si.f
+Pétrole Brent;BZ=F;Matières premières;;cb.f

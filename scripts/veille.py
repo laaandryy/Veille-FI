@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import csv
 import html
+import http.cookiejar
 import json
 import math
 import re
@@ -45,7 +46,12 @@ MAX_NEWS = 8                # actualités affichées par thème
 HISTORY_DAYS = 60           # conservation des liens « déjà vus »
 TOP_CRYPTO = 20
 TOP_STABLES = 12
-DEPEG_ALERT = 0.005         # écart à l'ancrage signalé au-delà de 0,5 %
+DEPEG_ALERT = 0.005
+# Jetons écartés du top crypto : stablecoins, jetons « wrapped » / de staking, fonds tokenisés.
+NOT_COINS = {"usdt", "usdc", "usde", "dai", "usds", "fdusd", "pyusd", "usd1", "usdg", "rlusd", "usdf", "usdtb", "bsc-usd",
+             "steth", "wsteth", "weeth", "reth", "cbeth", "meth", "jitosol", "bnsol", "wbtc", "weth", "cbbtc", "lbtc",
+             "solvbtc", "susde", "susds", "syrupusdc", "buidl", "usyc", "ustb", "ousg", "figr_heloc"}
+NOT_STABLES = {"BUIDL", "USYC", "USTB", "OUSG", "BENJI"}  # fonds monétaires tokenisés         # écart à l'ancrage signalé au-delà de 0,5 %
 BROWSER_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 UA = "veille-fi-bot/1.0 (+https://github.com/laaandryy/Veille-FI)"
@@ -129,76 +135,183 @@ def read_assets() -> list[dict]:
     rows = list(csv.reader(raw.splitlines(), delimiter=";"))
     out = []
     for row in rows[1:]:
-        row = [c.strip() for c in row] + ["", "", "", ""]
+        row = [c.strip() for c in row] + ["", "", "", "", ""]
         if not row[0] or not row[1]:
             continue
-        out.append({"name": row[0], "symbol": row[1], "category": row[2] or "Autres", "gecko": row[3] or None})
+        out.append({"name": row[0], "symbol": row[1], "category": row[2] or "Autres",
+                    "gecko": row[3] or None, "stooq": row[4] or None})
     return out
 
 
-# --------------------------------------------------------------------------- marchés (Yahoo)
+# --------------------------------------------------------------------------- marchés
+# Chaque fournisseur renvoie {"currency", "daily": [(jour, clôture)], "price", "intraday": [(ts, cours)]}.
+# Ordre : Yahoo Finance (session avec cookie + crumb), puis un secours gratuit selon le type d'actif.
+_YH: dict = {}
+
+
+def yahoo_opener():
+    if "op" in _YH:
+        return _YH["op"], _YH["crumb"]
+    cj = http.cookiejar.CookieJar()
+    op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    op.addheaders = [("User-Agent", BROWSER_UA), ("Accept", "*/*"), ("Accept-Language", "en-US,en;q=0.9")]
+    for u in ("https://fc.yahoo.com", "https://finance.yahoo.com/"):
+        try:
+            op.open(u, timeout=TIMEOUT).read()
+        except Exception:  # noqa: BLE001  (fc.yahoo.com répond 404 mais pose le cookie)
+            pass
+    crumb = None
+    try:
+        crumb = op.open("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=TIMEOUT).read().decode().strip() or None
+    except Exception as e:  # noqa: BLE001
+        log(f"  ! Yahoo crumb : {e}")
+    _YH.update(op=op, crumb=crumb)
+    return op, crumb
+
+
 def yahoo(symbol: str, rng: str, interval: str) -> dict:
+    if _YH.get("blocked", 0) >= 3:  # Yahoo bloque ce runner : inutile d'insister
+        raise RuntimeError("Yahoo indisponible (limite de requêtes)")
+    op, crumb = yahoo_opener()
     q = urllib.parse.quote(symbol)
     err = None
-    for host in ("query1", "query2"):
+    for attempt in range(4):
+        host = ("query1", "query2")[attempt % 2]
         url = f"https://{host}.finance.yahoo.com/v8/finance/chart/{q}?range={rng}&interval={interval}&includePrePost=false"
+        if crumb:
+            url += "&crumb=" + urllib.parse.quote(crumb)
         try:
-            data = fetch_json(url, ua=BROWSER_UA, retries=2)
+            data = json.loads(op.open(url, timeout=TIMEOUT).read())
             res = data["chart"]["result"][0]
             ts = res.get("timestamp") or []
             closes = res["indicators"]["quote"][0].get("close") or []
             pts = [(t, c) for t, c in zip(ts, closes) if c is not None]
             if pts:
+                _YH["blocked"] = 0
                 return {"meta": res.get("meta", {}), "points": pts}
+            err = "réponse vide"
         except Exception as e:  # noqa: BLE001
             err = e
+            if getattr(e, "code", None) == 404:
+                break
+            time.sleep(3 * (attempt + 1))
+    if "429" in str(err):
+        _YH["blocked"] = _YH.get("blocked", 0) + 1
     raise RuntimeError(f"Yahoo {symbol} {rng}: {err}")
+
+
+def from_yahoo(a: dict) -> dict:
+    d = yahoo(a["symbol"], "5y", "1d")
+    meta = d["meta"]
+    daily: dict[str, float] = {}
+    for t, c in d["points"]:  # une valeur par jour (la dernière l'emporte)
+        daily[day(t + (meta.get("gmtoffset") or 0))] = c
+    out = {"currency": meta.get("currency") or "", "daily": sorted(daily.items()),
+           "price": meta.get("regularMarketPrice"), "source": "Yahoo Finance"}
+    try:
+        out["intraday"] = yahoo(a["symbol"], "5d", "30m")["points"]
+    except Exception as e:  # noqa: BLE001
+        log(f"  ! {a['name']} intraday : {e}")
+    return out
+
+
+def from_ecb(a: dict) -> dict:
+    """Devises : taux de référence BCE via Frankfurter (quotidien, sans clé)."""
+    m = re.fullmatch(r"([A-Z]{3})([A-Z]{3})=X", a["symbol"].upper())
+    if not m:
+        raise RuntimeError("pas une paire de devises")
+    base, quote = m.groups()
+    start = (NOW - timedelta(days=5 * 365 + 5)).strftime("%Y-%m-%d")
+    data = fetch_json(f"https://api.frankfurter.dev/v1/{start}..?base={base}&symbols={quote}")
+    daily = sorted((k, v[quote]) for k, v in data["rates"].items() if quote in v)
+    return {"currency": quote, "daily": daily, "price": daily[-1][1], "source": "BCE (Frankfurter)"}
+
+
+def from_cryptocompare(a: dict) -> dict:
+    m = re.fullmatch(r"([A-Z0-9]+)-(USD|EUR)", a["symbol"].upper())
+    if not m:
+        raise RuntimeError("pas une crypto")
+    fsym, tsym = m.groups()
+    d = fetch_json(f"https://min-api.cryptocompare.com/data/v2/histoday?fsym={fsym}&tsym={tsym}&limit=1830")
+    if d.get("Response") == "Error":
+        raise RuntimeError(d.get("Message"))
+    daily = [(day(x["time"]), x["close"]) for x in d["Data"]["Data"] if x.get("close")]
+    out = {"currency": tsym, "daily": daily, "price": daily[-1][1], "source": "CryptoCompare"}
+    try:
+        h = fetch_json(f"https://min-api.cryptocompare.com/data/v2/histominute?fsym={fsym}&tsym={tsym}&limit=2000&aggregate=30")
+        out["intraday"] = [(x["time"], x["close"]) for x in h["Data"]["Data"] if x.get("close")][-240:]
+    except Exception as e:  # noqa: BLE001
+        log(f"  ! {a['name']} intraday CryptoCompare : {e}")
+    return out
+
+
+def from_coingecko(a: dict) -> dict:
+    if not a.get("gecko"):
+        raise RuntimeError("pas d'identifiant CoinGecko")
+    cur = "usd" if a["symbol"].upper().endswith("USD") else "eur"
+    d = fetch_json(f"https://api.coingecko.com/api/v3/coins/{a['gecko']}/market_chart?vs_currency={cur}&days=365&interval=daily")
+    daily: dict[str, float] = {}
+    for t, p in d["prices"]:
+        daily[day(t / 1000)] = p
+    series = sorted(daily.items())
+    return {"currency": cur.upper(), "daily": series, "price": series[-1][1], "source": "CoinGecko (1 an)"}
+
+
+def from_stooq(a: dict) -> dict:
+    if not a.get("stooq"):
+        raise RuntimeError("pas de symbole Stooq")
+    raw = fetch(f"https://stooq.com/q/d/l/?s={urllib.parse.quote(a['stooq'])}&i=d", ua=BROWSER_UA).decode("utf-8", "replace")
+    rows = list(csv.reader(raw.splitlines()))
+    if not rows or rows[0][:1] != ["Date"]:
+        raise RuntimeError(f"réponse inattendue : {raw[:60]!r}")
+    lim = (NOW - timedelta(days=5 * 365 + 5)).strftime("%Y-%m-%d")
+    daily = [(r[0], float(r[4])) for r in rows[1:] if len(r) > 4 and r[0] >= lim and r[4]]
+    cur = "USD" if a["stooq"].lower().endswith(".f") else ""
+    return {"currency": cur, "daily": daily, "price": daily[-1][1], "source": "Stooq"}
 
 
 def collect_asset(a: dict, prev: dict | None) -> dict:
     out = {**a}
-    try:
-        d = yahoo(a["symbol"], "5y", "1d")
-        meta = d["meta"]
-        daily: dict[str, float] = {}
-        for t, c in d["points"]:          # une valeur par jour (la dernière l'emporte)
-            daily[day(t + (meta.get("gmtoffset") or 0))] = c
-        series = sorted(daily.items())
-        price = meta.get("regularMarketPrice") or series[-1][1]
-        if series and series[-1][1] != price and series[-1][0] == NOW.strftime("%Y-%m-%d"):
-            series[-1] = (series[-1][0], price)
-        ref = price
-        out["daily"] = [[k, rnd(v, ref)] for k, v in series]
-        out["currency"] = meta.get("currency") or ""
-        out["price"] = rnd(price, ref)
-        out["market_time"] = iso(datetime.fromtimestamp(meta["regularMarketTime"], timezone.utc)) if meta.get("regularMarketTime") else None
-
-        def back(days: int | None = None, ytd: bool = False) -> float | None:
-            if ytd:
-                lim = f"{NOW.year - 1}-12-31"
-                prior = [v for k, v in series if k <= lim]
-                return prior[-1] if prior else None
-            lim = (NOW - timedelta(days=days)).strftime("%Y-%m-%d")  # type: ignore[arg-type]
-            prior = [v for k, v in series if k <= lim]
-            return prior[-1] if prior else series[0][1]
-
-        prev_close = series[-2][1] if len(series) > 1 else None
-        out["perf"] = {
-            "1J": pct(price, prev_close), "1S": pct(price, back(7)), "1M": pct(price, back(30)),
-            "YTD": pct(price, back(ytd=True)), "1A": pct(price, back(365)), "5A": pct(price, series[0][1]),
-        }
-    except Exception as e:  # noqa: BLE001
-        log(f"  ! {a['name']} ({a['symbol']}) : {e}")
-        if prev:
+    got, errors = None, []
+    for provider in (from_yahoo, from_ecb, from_cryptocompare, from_stooq, from_coingecko):
+        try:
+            got = provider(a)
+            if got["daily"]:
+                break
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{provider.__name__[5:]}: {e}")
+            got = None
+    if not got:
+        log(f"  ! {a['name']} ({a['symbol']}) : {' | '.join(errors)}")
+        if prev and prev.get("daily"):
             return {**prev, **a, "stale": True}
         return {**out, "daily": [], "intraday": [], "price": None, "perf": {}, "stale": True}
-    try:
-        d = yahoo(a["symbol"], "5d", "30m")
-        out["intraday"] = [[int(t), rnd(c, ref)] for t, c in d["points"]]
-    except Exception as e:  # noqa: BLE001
-        log(f"  ! {a['name']} intraday : {e}")
-        out["intraday"] = (prev or {}).get("intraday", [])
-    log(f"- {a['name']} : {out['price']} {out['currency']} ({out['perf'].get('1J')} %)")
+
+    series = got["daily"]
+    price = got.get("price") or series[-1][1]
+    today = NOW.strftime("%Y-%m-%d")
+    if series[-1][0] == today:
+        series[-1] = (today, price)
+    ref = price
+    out["daily"] = [[k, rnd(v, ref)] for k, v in series]
+    out["intraday"] = [[int(t), rnd(c, ref)] for t, c in got.get("intraday", [])]
+    out["currency"] = got.get("currency") or (prev or {}).get("currency") or ("EUR" if a["symbol"].endswith(".PA") else "")
+    out["price"] = rnd(price, ref)
+    out["source"] = got["source"]
+
+    def back(days: int) -> float:
+        lim = (NOW - timedelta(days=days)).strftime("%Y-%m-%d")
+        prior = [v for k, v in series if k <= lim]
+        return prior[-1] if prior else series[0][1]
+
+    ytd_prior = [v for k, v in series if k <= f"{NOW.year - 1}-12-31"]
+    prev_close = series[-2][1] if len(series) > 1 else None
+    out["perf"] = {
+        "1J": pct(price, prev_close), "1S": pct(price, back(7)), "1M": pct(price, back(30)),
+        "YTD": pct(price, ytd_prior[-1]) if ytd_prior else None, "1A": pct(price, back(365)),
+        "5A": pct(price, series[0][1]) if len(series) > 4 * 250 else None,
+    }
+    log(f"- {a['name']} [{got['source']}] : {out['price']} {out['currency']} ({out['perf'].get('1J')} %)")
     return out
 
 
@@ -212,8 +325,8 @@ def collect_crypto(prev: dict, stable_ids: set[str]) -> dict:
         top = []
         for c in rows:
             name = c.get("name") or ""
-            if c.get("id") in stable_ids or re.search(r"\b(wrapped|staked|bridged|restaked)\b", name, re.I) \
-                    or (c.get("symbol") or "").lower() in {"usdt", "usdc", "usde", "dai", "usds", "fdusd", "pyusd", "usd1", "steth", "wbtc", "weth", "wsteth", "weeth", "cbbtc", "bsc-usd"}:
+            if c.get("id") in stable_ids or re.search(r"\b(wrapped|staked|bridged|restaked|heloc|tokenized|treasury|liquid staking)\b", name, re.I) \
+                    or (c.get("symbol") or "").lower() in NOT_COINS:
                 continue
             spark = (c.get("sparkline_in_7d") or {}).get("price") or []
             step = max(1, len(spark) // 56)
@@ -276,7 +389,7 @@ def collect_stables(prev: dict, eurusd: dict[str, float], eurusd_now: float | No
     rows = []
     for s in assets:
         peg = s.get("pegType")
-        if peg not in ("peggedUSD", "peggedEUR"):
+        if peg not in ("peggedUSD", "peggedEUR") or (s.get("symbol") or "").upper() in NOT_STABLES:
             continue
         c = circ(s.get("circulating"), peg)
         price = s.get("price")
@@ -419,7 +532,8 @@ def google_news(query: str, lang: str, negative: str) -> list[dict]:
 def collect_theme(theme: dict, flt: NewsFilter, fcfg: dict) -> dict:
     negative = " ".join(f"-{w}" for w in fcfg.get("mots_exclus_recherche", []))
     news = google_news(theme["query_fr"], "fr", negative) + google_news(theme["query_en"], "en", negative)
-    terms = [" " + norm(t).strip() for t in theme.get("match", [theme["name"]])]
+    # Termes devant figurer dans le titre, en mots entiers (« Fed » ≠ « fédération »).
+    terms = [" " + norm(t).strip() + " " for t in theme.get("match", [theme["name"]])]
     extra = re.compile("|".join(theme["exclure"]), re.I) if theme.get("exclure") else None
     raw = len(news)
     news = [n for n in news if flt.ok(n, terms) and not (extra and extra.search(n["title"]))]
@@ -488,9 +602,12 @@ def main() -> int:
     log(f"{len(assets_cfg)} actifs à suivre")
 
     prev_assets = {a["symbol"]: a for a in previous.get("assets", [])}
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        assets = list(pool.map(lambda a: collect_asset(a, prev_assets.get(a["symbol"])), assets_cfg))
+    with ThreadPoolExecutor(max_workers=2) as pool:
         themes_f = pool.submit(lambda: [collect_theme(t, flt, fcfg) for t in cfg.get("themes", [])])
+        assets = []
+        for a in assets_cfg:  # séquentiel : Yahoo limite fortement les requêtes parallèles
+            assets.append(collect_asset(a, prev_assets.get(a["symbol"])))
+            time.sleep(0.8)
 
         eur = next((a for a in assets if a["symbol"].upper() == "EURUSD=X" and a.get("daily")), None)
         eurusd = {d: v for d, v in eur["daily"]} if eur else {}
