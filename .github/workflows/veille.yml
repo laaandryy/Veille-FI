@@ -36,10 +36,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Diagnostic des sources (temporaire)
-        if: github.ref != 'refs/heads/main'
-        run: python scripts/diag.py
-
       - name: Collecter la veille et générer index.html
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

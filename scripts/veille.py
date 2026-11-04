@@ -131,21 +131,23 @@ def pct(a: float | None, b: float | None) -> float | None:
 
 # --------------------------------------------------------------------------- inputs
 def read_assets() -> list[dict]:
+    """actifs.csv : Nom;Catégorie;Symbole;CNBC;CoinGecko (voir README)."""
     raw = CSV_PATH.read_bytes().decode("utf-8-sig", errors="replace")
     rows = list(csv.reader(raw.splitlines(), delimiter=";"))
     out = []
     for row in rows[1:]:
         row = [c.strip() for c in row] + ["", "", "", "", ""]
-        if not row[0] or not row[1]:
+        if not row[0] or not row[2]:
             continue
-        out.append({"name": row[0], "symbol": row[1], "category": row[2] or "Autres",
-                    "gecko": row[3] or None, "stooq": row[4] or None})
+        out.append({"name": row[0], "category": row[1] or "Autres", "symbol": row[2],
+                    "cnbc": row[3] or None, "gecko": row[4] or None})
     return out
 
 
 # --------------------------------------------------------------------------- marchés
 # Chaque fournisseur renvoie {"currency", "daily": [(jour, clôture)], "price", "intraday": [(ts, cours)]}.
-# Ordre : Yahoo Finance (session avec cookie + crumb), puis un secours gratuit selon le type d'actif.
+# Ordre : CNBC (indices, devises, matières premières), Binance puis CoinGecko (crypto), BCE (devises),
+# et Yahoo Finance en dernier recours (souvent bloqué depuis GitHub Actions).
 _YH: dict = {}
 
 
@@ -214,34 +216,81 @@ def from_yahoo(a: dict) -> dict:
     return out
 
 
-def from_ecb(a: dict) -> dict:
-    """Devises : taux de référence BCE via Frankfurter (quotidien, sans clé)."""
-    m = re.fullmatch(r"([A-Z]{3})([A-Z]{3})=X", a["symbol"].upper())
-    if not m:
-        raise RuntimeError("pas une paire de devises")
-    base, quote = m.groups()
-    start = (NOW - timedelta(days=5 * 365 + 5)).strftime("%Y-%m-%d")
-    data = fetch_json(f"https://api.frankfurter.dev/v1/{start}..?base={base}&symbols={quote}", retries=2)
-    daily = sorted((k, v[quote]) for k, v in data["rates"].items() if quote in v)
-    return {"currency": quote, "daily": daily, "price": daily[-1][1], "source": "BCE (Frankfurter)"}
-
-
-def from_cryptocompare(a: dict) -> dict:
-    m = re.fullmatch(r"([A-Z0-9]+)-(USD|EUR)", a["symbol"].upper())
-    if not m:
-        raise RuntimeError("pas une crypto")
-    fsym, tsym = m.groups()
-    d = fetch_json(f"https://min-api.cryptocompare.com/data/v2/histoday?fsym={fsym}&tsym={tsym}&limit=1830", retries=2)
-    if d.get("Response") == "Error":
-        raise RuntimeError(d.get("Message"))
-    daily = [(day(x["time"]), x["close"]) for x in d["Data"]["Data"] if x.get("close")]
-    out = {"currency": tsym, "daily": daily, "price": daily[-1][1], "source": "CryptoCompare"}
+def from_cnbc(a: dict) -> dict:
+    """Indices, devises, matières premières : graphes CNBC (sans clé), 5 ans + 5 jours en 30 min."""
+    sym = a.get("cnbc")
+    if not sym:
+        raise RuntimeError("pas de symbole CNBC")
+    q = urllib.parse.quote(sym, safe="")
+    base = "https://ts-api.cnbc.com/harmony/app/bars"
+    start = (NOW - timedelta(days=5 * 365 + 7)).strftime("%Y%m%d000000")
+    end = (NOW + timedelta(days=1)).strftime("%Y%m%d000000")
+    bars = fetch_json(f"{base}/{q}/1D/{start}/{end}/adjusted/EST5EDT.json", ua=BROWSER_UA, retries=2)["barData"]["priceBars"]
+    daily = {}
+    for b in bars:
+        if b.get("close") not in (None, ""):
+            t = b["tradeTime"]
+            daily[f"{t[:4]}-{t[4:6]}-{t[6:8]}"] = float(b["close"])
+    series = sorted(daily.items())
+    if not series:
+        raise RuntimeError("aucune donnée")
+    if "=" in sym:
+        cur = a["symbol"].upper()[3:6] if re.fullmatch(r"[A-Z]{6}=X", a["symbol"].upper()) else "USD"
+    else:
+        cur = "USD" if sym.startswith("@") else ""
+    out = {"currency": cur, "daily": series, "price": series[-1][1], "source": "CNBC"}
     try:
-        h = fetch_json(f"https://min-api.cryptocompare.com/data/v2/histominute?fsym={fsym}&tsym={tsym}&limit=2000&aggregate=30", retries=1)
-        out["intraday"] = [(x["time"], x["close"]) for x in h["Data"]["Data"] if x.get("close")][-240:]
+        s7 = (NOW - timedelta(days=7)).strftime("%Y%m%d000000")
+        ib = fetch_json(f"{base}/{q}/30M/{s7}/{end}/adjusted/EST5EDT.json", ua=BROWSER_UA, retries=1)["barData"]["priceBars"]
+        intr = [(int(b["tradeTimeinMills"]) // 1000, float(b["close"])) for b in ib if b.get("close") not in (None, "")]
+        cutoff = NOW.timestamp() - 5 * 86400
+        out["intraday"] = [x for x in intr if x[0] >= cutoff] or intr[-240:]
+        if out["intraday"]:
+            out["price"] = out["intraday"][-1][1]
     except Exception as e:  # noqa: BLE001
-        log(f"  ! {a['name']} intraday CryptoCompare : {e}")
+        log(f"  ! {a['name']} intraday CNBC : {e}")
     return out
+
+
+def from_binance(a: dict) -> dict:
+    """Crypto : chandelles journalières (5 ans) et 30 min du miroir public de données Binance."""
+    m = re.fullmatch(r"([A-Z0-9]+)-USD", a["symbol"].upper())
+    if not m:
+        raise RuntimeError("pas une crypto en USD")
+    pair = m.group(1) + "USDT"
+    base = "https://data-api.binance.vision/api/v3/klines"
+    start = int((NOW - timedelta(days=5 * 365 + 5)).timestamp() * 1000)
+    daily = []
+    while True:
+        rows = fetch_json(f"{base}?symbol={pair}&interval=1d&limit=1000&startTime={start}", retries=2)
+        daily += [(day(r[0] / 1000), float(r[4])) for r in rows]
+        if len(rows) < 1000:
+            break
+        start = rows[-1][0] + 1
+    if not daily:
+        raise RuntimeError("aucune donnée")
+    out = {"currency": "USD", "daily": daily, "price": daily[-1][1], "source": "Binance"}
+    try:
+        rows = fetch_json(f"{base}?symbol={pair}&interval=30m&limit=240", retries=1)
+        out["intraday"] = [(r[0] // 1000, float(r[4])) for r in rows]
+        if out["intraday"]:
+            out["price"] = out["intraday"][-1][1]
+    except Exception as e:  # noqa: BLE001
+        log(f"  ! {a['name']} intraday Binance : {e}")
+    return out
+
+
+def from_ecb(a: dict) -> dict:
+    """Devises contre l'euro : taux de référence quotidiens de la BCE (sans intraday)."""
+    m = re.fullmatch(r"EUR([A-Z]{3})=X", a["symbol"].upper())
+    if not m:
+        raise RuntimeError("pas une paire EUR/xxx")
+    quote = m.group(1)
+    start = (NOW - timedelta(days=5 * 365 + 5)).strftime("%Y-%m-%d")
+    raw = fetch(f"https://data-api.ecb.europa.eu/service/data/EXR/D.{quote}.EUR.SP00.A?startPeriod={start}&format=csvdata", retries=2).decode()
+    rows = list(csv.DictReader(raw.splitlines()))
+    daily = sorted((r["TIME_PERIOD"], float(r["OBS_VALUE"])) for r in rows if r.get("OBS_VALUE"))
+    return {"currency": quote, "daily": daily, "price": daily[-1][1], "source": "BCE"}
 
 
 def from_coingecko(a: dict) -> dict:
@@ -256,24 +305,11 @@ def from_coingecko(a: dict) -> dict:
     return {"currency": cur.upper(), "daily": series, "price": series[-1][1], "source": "CoinGecko (1 an)"}
 
 
-def from_stooq(a: dict) -> dict:
-    if not a.get("stooq"):
-        raise RuntimeError("pas de symbole Stooq")
-    raw = fetch(f"https://stooq.com/q/d/l/?s={urllib.parse.quote(a['stooq'])}&i=d", ua=BROWSER_UA, retries=1).decode("utf-8", "replace")
-    rows = list(csv.reader(raw.splitlines()))
-    if not rows or rows[0][:1] != ["Date"]:
-        raise RuntimeError(f"réponse inattendue : {raw[:60]!r}")
-    lim = (NOW - timedelta(days=5 * 365 + 5)).strftime("%Y-%m-%d")
-    daily = [(r[0], float(r[4])) for r in rows[1:] if len(r) > 4 and r[0] >= lim and r[4]]
-    cur = "USD" if a["stooq"].lower().endswith(".f") else ""
-    return {"currency": cur, "daily": daily, "price": daily[-1][1], "source": "Stooq"}
-
-
 def collect_asset(a: dict, prev: dict | None) -> dict:
     t0 = time.time()
     out = {**a}
     got, errors = None, []
-    for provider in (from_yahoo, from_ecb, from_cryptocompare, from_stooq, from_coingecko):
+    for provider in (from_cnbc, from_binance, from_coingecko, from_ecb, from_yahoo):
         try:
             got = provider(a)
             if got["daily"]:
@@ -290,8 +326,11 @@ def collect_asset(a: dict, prev: dict | None) -> dict:
     series = got["daily"]
     price = got.get("price") or series[-1][1]
     today = NOW.strftime("%Y-%m-%d")
+    intr = got.get("intraday") or []
     if series[-1][0] == today:
         series[-1] = (today, price)
+    elif intr and day(intr[-1][0]) > series[-1][0]:  # séance du jour pas encore clôturée
+        series.append((day(intr[-1][0]), price))
     ref = price
     out["daily"] = [[k, rnd(v, ref)] for k, v in series]
     out["intraday"] = [[int(t), rnd(c, ref)] for t, c in got.get("intraday", [])]

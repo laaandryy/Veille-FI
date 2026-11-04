@@ -19,13 +19,14 @@ technologique. Aucune clé d'API n'est nécessaire.
   de cours et communiqués ; badge « Nouveau » pour ce qui n'avait pas été vu la veille.
 - Recherche dans chaque onglet, mode clair / sombre, affichage mobile.
 - **Prix en direct** : dans le navigateur, les prix crypto sont rafraîchis toutes les 90 s (CoinGecko).
-  Les autres cours (indices, devises, matières premières) datent du passage de 05:00 UTC.
+  Les autres cours (indices, devises, matières premières) datent du dernier passage de la tâche.
 
 ## Fonctionnement
 
 1. Chaque jour à 05:00 UTC, `scripts/veille.py` lit `actifs.csv` et `scripts/sources.json`.
-2. Il interroge Yahoo Finance (cours), CoinGecko (crypto), DefiLlama (stablecoins, TVL),
-   alternative.me (Fear & Greed) et Google News (actualités).
+2. Il interroge CNBC (indices, devises, matières premières), Binance puis CoinGecko (historique crypto),
+   la BCE (secours devises), CoinGecko (marché crypto), DefiLlama (stablecoins, TVL),
+   alternative.me (Fear & Greed) et Google News (actualités). Yahoo Finance sert de dernier recours.
 3. Il génère `index.html` et `data/veille.json` puis les pousse sur `main`.
    Si une source est indisponible, les données du passage précédent sont conservées.
 
@@ -34,9 +35,13 @@ Modifier `actifs.csv` ou `scripts/` sur `main` relance aussi la génération.
 
 ## Ajouter un actif
 
-Ajoutez une ligne `Nom;Symbole Yahoo;Catégorie;Identifiant CoinGecko` dans `actifs.csv`.
-Le symbole est celui de [Yahoo Finance](https://finance.yahoo.com) (ex. `^FCHI`, `AAPL`, `MC.PA`, `BTC-USD`, `EURUSD=X`, `GC=F`).
-L'identifiant CoinGecko (facultatif, ex. `bitcoin`) active le prix en direct pour une crypto cotée en USD.
+Ajoutez une ligne `Nom;Catégorie;Symbole;CNBC;CoinGecko` dans `actifs.csv` :
+
+- **Symbole** : identifiant de l'actif au format Yahoo Finance (ex. `^FCHI`, `MC.PA`, `BTC-USD`, `EURUSD=X`, `GC=F`).
+  Pour une crypto, `XXX-USD` suffit : l'historique vient de Binance (paire `XXXUSDT`).
+- **CNBC** : symbole utilisé sur [cnbc.com/quotes](https://www.cnbc.com/quotes/.FCHI) pour les indices, actions,
+  devises et matières premières (ex. `.FCHI`, `.SPX`, `EUR=`, `@GC.1`, `@LCO.1`, `MC-FR`).
+- **CoinGecko** (facultatif, ex. `bitcoin`) : active le prix en direct dans la page et sert de secours.
 
 ## Actualités
 
