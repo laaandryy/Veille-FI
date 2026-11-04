@@ -55,7 +55,7 @@ NOT_STABLES = {"BUIDL", "USYC", "USTB", "OUSG", "BENJI"}  # fonds monétaires to
 BROWSER_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 UA = "veille-fi-bot/1.0 (+https://github.com/laaandryy/Veille-FI)"
-TIMEOUT = 25
+TIMEOUT = 15
 
 
 # --------------------------------------------------------------------------- utils
@@ -157,12 +157,12 @@ def yahoo_opener():
     op.addheaders = [("User-Agent", BROWSER_UA), ("Accept", "*/*"), ("Accept-Language", "en-US,en;q=0.9")]
     for u in ("https://fc.yahoo.com", "https://finance.yahoo.com/"):
         try:
-            op.open(u, timeout=TIMEOUT).read()
+            op.open(u, timeout=10).read()
         except Exception:  # noqa: BLE001  (fc.yahoo.com répond 404 mais pose le cookie)
             pass
     crumb = None
     try:
-        crumb = op.open("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=TIMEOUT).read().decode().strip() or None
+        crumb = op.open("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=10).read().decode().strip() or None
     except Exception as e:  # noqa: BLE001
         log(f"  ! Yahoo crumb : {e}")
     _YH.update(op=op, crumb=crumb)
@@ -170,18 +170,18 @@ def yahoo_opener():
 
 
 def yahoo(symbol: str, rng: str, interval: str) -> dict:
-    if _YH.get("blocked", 0) >= 3:  # Yahoo bloque ce runner : inutile d'insister
+    if _YH.get("blocked", 0) >= 2:  # Yahoo bloque ce runner : inutile d'insister
         raise RuntimeError("Yahoo indisponible (limite de requêtes)")
     op, crumb = yahoo_opener()
     q = urllib.parse.quote(symbol)
     err = None
-    for attempt in range(4):
+    for attempt in range(2):
         host = ("query1", "query2")[attempt % 2]
         url = f"https://{host}.finance.yahoo.com/v8/finance/chart/{q}?range={rng}&interval={interval}&includePrePost=false"
         if crumb:
             url += "&crumb=" + urllib.parse.quote(crumb)
         try:
-            data = json.loads(op.open(url, timeout=TIMEOUT).read())
+            data = json.loads(op.open(url, timeout=12).read())
             res = data["chart"]["result"][0]
             ts = res.get("timestamp") or []
             closes = res["indicators"]["quote"][0].get("close") or []
@@ -194,9 +194,8 @@ def yahoo(symbol: str, rng: str, interval: str) -> dict:
             err = e
             if getattr(e, "code", None) == 404:
                 break
-            time.sleep(3 * (attempt + 1))
-    if "429" in str(err):
-        _YH["blocked"] = _YH.get("blocked", 0) + 1
+            time.sleep(2)
+    _YH["blocked"] = _YH.get("blocked", 0) + 1
     raise RuntimeError(f"Yahoo {symbol} {rng}: {err}")
 
 
@@ -222,7 +221,7 @@ def from_ecb(a: dict) -> dict:
         raise RuntimeError("pas une paire de devises")
     base, quote = m.groups()
     start = (NOW - timedelta(days=5 * 365 + 5)).strftime("%Y-%m-%d")
-    data = fetch_json(f"https://api.frankfurter.dev/v1/{start}..?base={base}&symbols={quote}")
+    data = fetch_json(f"https://api.frankfurter.dev/v1/{start}..?base={base}&symbols={quote}", retries=2)
     daily = sorted((k, v[quote]) for k, v in data["rates"].items() if quote in v)
     return {"currency": quote, "daily": daily, "price": daily[-1][1], "source": "BCE (Frankfurter)"}
 
@@ -232,13 +231,13 @@ def from_cryptocompare(a: dict) -> dict:
     if not m:
         raise RuntimeError("pas une crypto")
     fsym, tsym = m.groups()
-    d = fetch_json(f"https://min-api.cryptocompare.com/data/v2/histoday?fsym={fsym}&tsym={tsym}&limit=1830")
+    d = fetch_json(f"https://min-api.cryptocompare.com/data/v2/histoday?fsym={fsym}&tsym={tsym}&limit=1830", retries=2)
     if d.get("Response") == "Error":
         raise RuntimeError(d.get("Message"))
     daily = [(day(x["time"]), x["close"]) for x in d["Data"]["Data"] if x.get("close")]
     out = {"currency": tsym, "daily": daily, "price": daily[-1][1], "source": "CryptoCompare"}
     try:
-        h = fetch_json(f"https://min-api.cryptocompare.com/data/v2/histominute?fsym={fsym}&tsym={tsym}&limit=2000&aggregate=30")
+        h = fetch_json(f"https://min-api.cryptocompare.com/data/v2/histominute?fsym={fsym}&tsym={tsym}&limit=2000&aggregate=30", retries=1)
         out["intraday"] = [(x["time"], x["close"]) for x in h["Data"]["Data"] if x.get("close")][-240:]
     except Exception as e:  # noqa: BLE001
         log(f"  ! {a['name']} intraday CryptoCompare : {e}")
@@ -249,7 +248,7 @@ def from_coingecko(a: dict) -> dict:
     if not a.get("gecko"):
         raise RuntimeError("pas d'identifiant CoinGecko")
     cur = "usd" if a["symbol"].upper().endswith("USD") else "eur"
-    d = fetch_json(f"https://api.coingecko.com/api/v3/coins/{a['gecko']}/market_chart?vs_currency={cur}&days=365&interval=daily")
+    d = fetch_json(f"https://api.coingecko.com/api/v3/coins/{a['gecko']}/market_chart?vs_currency={cur}&days=365&interval=daily", retries=2)
     daily: dict[str, float] = {}
     for t, p in d["prices"]:
         daily[day(t / 1000)] = p
@@ -260,7 +259,7 @@ def from_coingecko(a: dict) -> dict:
 def from_stooq(a: dict) -> dict:
     if not a.get("stooq"):
         raise RuntimeError("pas de symbole Stooq")
-    raw = fetch(f"https://stooq.com/q/d/l/?s={urllib.parse.quote(a['stooq'])}&i=d", ua=BROWSER_UA).decode("utf-8", "replace")
+    raw = fetch(f"https://stooq.com/q/d/l/?s={urllib.parse.quote(a['stooq'])}&i=d", ua=BROWSER_UA, retries=1).decode("utf-8", "replace")
     rows = list(csv.reader(raw.splitlines()))
     if not rows or rows[0][:1] != ["Date"]:
         raise RuntimeError(f"réponse inattendue : {raw[:60]!r}")
@@ -271,6 +270,7 @@ def from_stooq(a: dict) -> dict:
 
 
 def collect_asset(a: dict, prev: dict | None) -> dict:
+    t0 = time.time()
     out = {**a}
     got, errors = None, []
     for provider in (from_yahoo, from_ecb, from_cryptocompare, from_stooq, from_coingecko):
@@ -282,7 +282,7 @@ def collect_asset(a: dict, prev: dict | None) -> dict:
             errors.append(f"{provider.__name__[5:]}: {e}")
             got = None
     if not got:
-        log(f"  ! {a['name']} ({a['symbol']}) : {' | '.join(errors)}")
+        log(f"  ! {a['name']} ({a['symbol']}, {time.time() - t0:.0f} s) : {' | '.join(errors)}")
         if prev and prev.get("daily"):
             return {**prev, **a, "stale": True}
         return {**out, "daily": [], "intraday": [], "price": None, "perf": {}, "stale": True}
@@ -311,7 +311,7 @@ def collect_asset(a: dict, prev: dict | None) -> dict:
         "YTD": pct(price, ytd_prior[-1]) if ytd_prior else None, "1A": pct(price, back(365)),
         "5A": pct(price, series[0][1]) if len(series) > 4 * 250 else None,
     }
-    log(f"- {a['name']} [{got['source']}] : {out['price']} {out['currency']} ({out['perf'].get('1J')} %)")
+    log(f"- {a['name']} [{got['source']}, {time.time() - t0:.0f} s] : {out['price']} {out['currency']} ({out['perf'].get('1J')} %)")
     return out
 
 
