@@ -193,7 +193,7 @@
    "\\b(deadline alert|class action|shareholder alert|investors? (who|with) (lost|losses)|seasonal returns|prediction market|current price of|price on \\w+\\.? \\d)",
    "\\((NASDAQ|NYSE|AMEX|OTC|TSX|LSE)\\s?:",
    "\\([A-Z.]{1,8}:(NASDAQ|NYSE|AMEX)\\)",
-   "^[A-Z0-9.]{2,12}: "
+   "^[A-Z0-9.]{2,12}: .*\\b(Q[1-4]|earnings|guidance|margins?|revenue)\\b"
   ],
   "sources_exclues": [
    "motley fool",
