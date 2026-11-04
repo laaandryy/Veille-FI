@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veille finance & crypto</title>
+<meta name="description" content="Veille finance quotidienne : marchés, crypto, stablecoins, graphes et actualités filtrées.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script>
+  try { const t = localStorage.getItem("vfi-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<style>
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f0f0ec; --border: #e4e4df;
+    --text: #18181b; --muted: #6b6b73; --faint: #a1a1aa;
+    --accent: #E8631E; --accent-soft: #fdeee4; --orange-deep: #E8631E; --orange-bright: #FF7A2E;
+    --new: var(--orange-deep); --new-soft: #fdeee4; --line: var(--orange-deep);
+    --up: #15803d; --up-soft: #e7f6ec; --down: #dc2626; --down-soft: #fdecec;
+    --crit: #dc2626; --crit-soft: #fdecec; --warn: #a16207; --warn-soft: #fdf7d8;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+    --radius: 14px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0d10; --surface: #16161a; --surface-2: #1e1e24; --border: #26262d;
+      --text: #ececf1; --muted: #9b9ba6; --faint: #5f5f69;
+      --accent: #FF7A2E; --accent-soft: #3a1f10; --new: var(--orange-bright); --new-soft: #3a1f10; --line: var(--orange-bright);
+      --up: #4ade80; --up-soft: #12301d; --down: #f87171; --down-soft: #3a1717;
+      --crit: #f87171; --crit-soft: #3a1717; --warn: #facc15; --warn-soft: #2f2a0c;
+      --shadow: none; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0d10; --surface: #16161a; --surface-2: #1e1e24; --border: #26262d;
+    --text: #ececf1; --muted: #9b9ba6; --faint: #5f5f69;
+    --accent: #FF7A2E; --accent-soft: #3a1f10; --new: var(--orange-bright); --new-soft: #3a1f10; --line: var(--orange-bright);
+    --up: #4ade80; --up-soft: #12301d; --down: #f87171; --down-soft: #3a1717;
+    --crit: #f87171; --crit-soft: #3a1717; --warn: #facc15; --warn-soft: #2f2a0c;
+    --shadow: none; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; }
+  .num, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+
+  header.hero { padding-top: 56px; padding-bottom: 8px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 500; flex-wrap: wrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--new); box-shadow: 0 0 0 4px var(--new-soft); }
+  .live { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .live.on i { background: var(--up); animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.05; letter-spacing: -0.035em; margin: 14px 0 12px; font-weight: 700; }
+  h1 span { color: var(--muted); font-weight: 600; }
+  .lead { color: var(--muted); max-width: 680px; margin: 0; font-size: 16px; }
+
+  /* Bandeau de cotations */
+  .ticker { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 28px 0 0; padding: 2px; }
+  .ticker::-webkit-scrollbar { display: none; }
+  .tk { flex: none; display: flex; flex-direction: column; gap: 1px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 9px 13px; cursor: pointer; text-align: left; color: var(--text); box-shadow: var(--shadow); min-width: 128px; }
+  .tk:hover { border-color: var(--faint); }
+  .tk .n { font-size: 12px; color: var(--muted); font-weight: 500; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .tk .p { font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .lv { width: 6px; height: 6px; border-radius: 50%; background: var(--up); display: inline-block; }
+
+  .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--muted); }
+  .chg { font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .pill.up { background: var(--up-soft); } .pill.down { background: var(--down-soft); } .pill.flat { background: var(--surface-2); }
+
+  /* Résumé du jour */
+  .summary { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; margin: 16px 0 0; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+  .stat small { color: var(--muted); font-size: 12.5px; display: block; }
+  .stat b { display: block; font-size: 22px; letter-spacing: -0.02em; font-weight: 700; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat .sub { font-size: 12px; color: var(--muted); }
+  .gauge { height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--down), var(--warn) 50%, var(--up)); position: relative; margin-top: 8px; opacity: .85; }
+  .gauge i { position: absolute; top: -3px; width: 4px; height: 12px; border-radius: 2px; background: var(--text); transform: translateX(-2px); box-shadow: 0 0 0 2px var(--surface); }
+  .day { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+  .box h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .mv { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 14px; cursor: pointer; }
+  .mv:first-of-type { border-top: 0; }
+  .mv span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mv small { color: var(--faint); margin-left: 6px; font-size: 12px; }
+  .ok { font-size: 13px; color: var(--muted); padding: 6px 0; }
+
+  /* Barre d'outils */
+  .toolbar { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); margin-top: 28px; }
+  .toolbar .wrap { display: flex; gap: 10px; align-items: center; padding-top: 12px; padding-bottom: 12px; flex-wrap: wrap; }
+  .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; flex: none; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .seg::-webkit-scrollbar { display: none; }
+  .seg button { border: 0; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 7px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .seg .n { font-size: 11px; background: var(--new-soft); color: var(--new); padding: 0 6px; border-radius: 999px; }
+  .seg.sm button { font-size: 12px; padding: 4px 9px; }
+  .search { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0 12px; min-width: 0; }
+  .search input { border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; padding: 9px 0; width: 100%; }
+  .search svg { flex: none; color: var(--faint); }
+  .icon-btn { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 10px; width: 40px; height: 40px; display: grid; place-items: center; cursor: pointer; }
+  .icon-btn:hover { color: var(--text); }
+  .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+  .chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+  main.wrap { padding-top: 24px; padding-bottom: 64px; }
+  section.view { display: none; flex-direction: column; gap: 16px; }
+  section.view.on { display: flex; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .card h2 { font-size: 18px; margin: 0; letter-spacing: -0.02em; font-weight: 650; }
+  .cat { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .price-big { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .ctrls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
+  .toggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  select.pick { border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; padding: 7px 10px; border-radius: 10px; max-width: 100%; }
+  .chart { position: relative; height: 260px; min-width: 0; }
+  .chart.tall { height: 400px; }
+  .legend { position: absolute; top: 6px; left: 8px; z-index: 3; pointer-events: none; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--surface) 85%, transparent); padding: 2px 6px; border-radius: 6px; }
+  .legend b { color: var(--text); font-weight: 600; }
+  .src { font-size: 12px; color: var(--faint); }
+  .src a { text-decoration: underline; text-underline-offset: 2px; }
+
+  /* Tableaux */
+  .tbl { overflow-x: auto; margin: 0 -4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: right; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 600; padding: 8px 8px; white-space: nowrap; cursor: pointer; user-select: none; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th[aria-sort] { color: var(--text); }
+  th[aria-sort="ascending"]::after { content: " ↑"; } th[aria-sort="descending"]::after { content: " ↓"; }
+  td { text-align: right; padding: 9px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover td { background: var(--surface-2); }
+  tr.alert td { background: var(--warn-soft); }
+  .nm { display: flex; align-items: center; gap: 10px; min-width: 150px; }
+  .nm img { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+  .nm b { font-weight: 600; }
+  .nm small { color: var(--faint); font-size: 12px; }
+  .rk { color: var(--faint); font-size: 12px; width: 22px; display: inline-block; }
+  svg.spark { display: block; margin-left: auto; }
+  .tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .bars { display: flex; flex-direction: column; gap: 8px; }
+  .bar { display: grid; grid-template-columns: 54px 1fr 58px; align-items: center; gap: 10px; font-size: 13px; }
+  .bar .tr { height: 8px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+  .bar .tr i { display: block; height: 100%; background: var(--line); border-radius: 99px; }
+  .bar span:last-child { text-align: right; color: var(--muted); }
+  .stats3 { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 12px; }
+
+  /* Actualités */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .badge-new { flex: none; font-size: 12px; font-weight: 600; color: var(--new); background: var(--new-soft); padding: 3px 9px; border-radius: 999px; }
+  ul.news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  ul.news li { border-top: 1px solid var(--border); }
+  ul.news li:first-child { border-top: 0; }
+  ul.news a { display: block; padding: 9px 0; }
+  ul.news a:hover .t { color: var(--accent); }
+  .t { font-size: 14px; font-weight: 500; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .meta .nw { color: var(--new); font-weight: 600; }
+  .meta .lg { font-size: 10px; font-weight: 700; color: var(--faint); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  mark { background: var(--new-soft); color: inherit; border-radius: 3px; }
+  .empty { font-size: 13px; color: var(--faint); padding: 6px 0; }
+  .none { text-align: center; color: var(--muted); padding: 48px 0; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); font-weight: 600; }
+  footer.wrap { border-top: 1px solid var(--border); color: var(--faint); font-size: 13px; padding-top: 24px; padding-bottom: 40px; }
+  footer a { text-decoration: underline; text-underline-offset: 2px; }
+
+  @media (max-width: 1100px) { .summary { grid-template-columns: repeat(3, minmax(0,1fr)); } .stats3 { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+  @media (max-width: 860px) { .row2, .day { grid-template-columns: minmax(0,1fr); } }
+  @media (max-width: 720px) {
+    header.hero { padding-top: 36px; }
+    .wrap { padding: 0 16px; }
+    .summary, .stats3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .card { padding: 16px; }
+    .chart { height: 230px; } .chart.tall { height: 300px; }
+    .opt { display: none; }
+    .toolbar .seg:first-child { order: -1; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header class="hero wrap">
+  <div class="eyebrow"><span class="dot"></span><span id="updated">Mise à jour quotidienne</span><span>·</span><span class="live" id="live"><i></i><span>Direct</span></span></div>
+  <h1>Veille finance <span>du jour</span></h1>
+  <p class="lead">Marchés, crypto et stablecoins : cours, graphes et actualités filtrées. Données collectées chaque matin, prix crypto rafraîchis en direct.</p>
+  <div class="ticker" id="ticker" aria-label="Cotations"></div>
+  <div class="summary" id="summary"></div>
+  <div class="day" id="day"></div>
+</header>
+
+<div class="toolbar">
+  <div class="wrap">
+    <div class="seg" role="tablist" aria-label="Vue" id="tabs">
+      <button data-v="marches" aria-pressed="true">Marchés</button>
+      <button data-v="crypto" aria-pressed="false">Crypto</button>
+      <button data-v="stables" aria-pressed="false">Stablecoins <span class="n" id="alert-n" hidden></span></button>
+      <button data-v="actus" aria-pressed="false">Actualités <span class="n" id="new-n" hidden></span></button>
+    </div>
+    <label class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Rechercher…" autocomplete="off">
+    </label>
+    <button class="icon-btn" id="theme" title="Basculer clair / sombre" aria-label="Basculer clair / sombre">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="view" id="v-marches">
+    <div class="row2" id="featured"></div>
+    <div class="card" id="explorer"></div>
+    <div class="card">
+      <div class="card-head"><div><h2>Performances</h2><div class="cat">Cliquez sur une ligne pour afficher son graphe.</div></div>
+        <div class="chips" id="cat-chips"></div></div>
+      <div class="tbl"><table id="perf-table"></table></div>
+      <p class="none" id="perf-none" hidden>Aucun actif pour ce filtre.</p>
+    </div>
+  </section>
+
+  <section class="view" id="v-crypto">
+    <div class="stats3" id="crypto-stats"></div>
+    <div class="row2"><div class="card" id="fng-card"></div><div class="card" id="tvl-card"></div></div>
+    <div class="card">
+      <div class="card-head"><div><h2>Top 20 crypto</h2><div class="cat">Hors stablecoins et jetons « wrapped ». Prix en dollars, rafraîchis en direct. Triez en cliquant sur les colonnes.</div></div></div>
+      <div class="tbl"><table id="crypto-table"></table></div>
+      <p class="none" id="crypto-none" hidden>Aucune crypto pour ce filtre.</p>
+    </div>
+    <div class="card" id="dom-card"></div>
+  </section>
+
+  <section class="view" id="v-stables">
+    <div class="stats3" id="stable-stats"></div>
+    <div class="card" id="stable-chart"></div>
+    <div class="card">
+      <div class="card-head"><div><h2>Principaux stablecoins</h2><div class="cat">Écart à l'ancrage signalé au-delà de ±0,5 %. Cliquez sur une ligne pour voir l'historique de son ancrage.</div></div></div>
+      <div class="tbl"><table id="stable-table"></table></div>
+      <p class="none" id="stable-none" hidden>Aucun stablecoin pour ce filtre.</p>
+    </div>
+    <div class="card" id="peg-card"></div>
+  </section>
+
+  <section class="view" id="v-actus">
+    <div class="chips" id="theme-chips"></div>
+    <div class="grid" id="news-grid"></div>
+    <p class="none" id="news-none" hidden>Aucun article pour ce filtre.</p>
+  </section>
+</main>
+
+<footer class="wrap">
+  Généré automatiquement chaque jour à 05:00 UTC par la tâche planifiée <b>veille</b> à partir de <a href="actifs.csv">actifs.csv</a>.
+  Sources : Yahoo Finance (cours), CoinGecko (crypto), DefiLlama (stablecoins, TVL), alternative.me (Fear &amp; Greed), Google News (actualités).
+  Graphes : <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts</a>.
+  Informations fournies à titre indicatif, sans valeur de conseil en investissement.
+</footer>
+
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+const DATA = /*__DATA__*/null;
+(function () {
+  const $ = (id) => document.getElementById(id);
+  if (!DATA) { $("v-marches").classList.add("on"); $("featured").innerHTML = '<p class="empty">Aucune donnée pour le moment.</p>'; return; }
+  const LWC = window.LightweightCharts;
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+  /* ------------------------------------------------------------------ formats */
+  const CUR = { USD: "$", EUR: "€", GBP: "£", CHF: "CHF", JPY: "¥" };
+  const nf = (d) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const decimals = (v, fx) => { const a = Math.abs(v); return fx ? 4 : a >= 100 ? 2 : a >= 1 ? (a >= 10 ? 2 : 3) : a >= 0.01 ? 4 : 6; };
+  const num = (v, fx) => v == null || isNaN(v) ? "–" : nf(decimals(v, fx)).format(v);
+  const assetFmt = (a) => (v) => {
+    if (v == null) return "–";
+    const fx = a.category === "Devises";
+    const s = num(v, fx);
+    if (a.category === "Indices" || fx) return s;
+    return s + " " + (CUR[a.currency] || a.currency || "");
+  };
+  const usd = (v) => v == null ? "–" : num(v) + " $";
+  const compact = (v, cur = "$") => v == null ? "–" : new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: v >= 1e12 ? 2 : 1 }).format(v) + " " + cur;
+  const cls = (v) => v == null || Math.abs(v) < 0.005 ? "flat" : v > 0 ? "up" : "down";
+  const pct = (v, d = 2) => v == null || isNaN(v) ? "–" : (v > 0 ? "▲ +" : v < 0 ? "▼ " : "") + nf(d).format(v) + " %";
+  const chg = (v, d) => `<span class="chg num ${cls(v)}">${pct(v, d)}</span>`;
+  const rtf = new Intl.RelativeTimeFormat("fr", { numeric: "auto" });
+  const ago = (iso) => {
+    if (!iso) return "";
+    const s = (new Date(iso).getTime() - Date.now()) / 1000;
+    for (const [u, sec] of [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]])
+      if (Math.abs(s) >= sec || u === "minute") return rtf.format(Math.round(s / sec), u);
+  };
+  const fmtDay = (t) => typeof t === "number"
+    ? new Date(t * 1000).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : new Date(t + "T12:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+  const FNG_FR = { "Extreme Fear": "Peur extrême", "Fear": "Peur", "Neutral": "Neutre", "Greed": "Avidité", "Extreme Greed": "Avidité extrême" };
+  const fngLabel = (v) => v < 25 ? "Peur extrême" : v < 45 ? "Peur" : v <= 55 ? "Neutre" : v <= 75 ? "Avidité" : "Avidité extrême";
+
+  const gen = new Date(DATA.generated_at);
+  $("updated").textContent = "Mis à jour le " + gen.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) + " à " + gen.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+  const assets = (DATA.assets || []).filter((a) => a.daily && a.daily.length);
+  const crypto = DATA.crypto || {};
+  const stables = DATA.stables || {};
+  const themes = DATA.themes || [];
+  const bySym = Object.fromEntries(assets.map((a) => [a.symbol, a]));
+
+  /* ------------------------------------------------------------------ graphes */
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const alpha = (hex, a) => { const h = hex.replace("#", ""); const n = parseInt(h.length === 3 ? h.replace(/./g, "$&$&") : h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
+  const tzShift = (t) => t - new Date(t * 1000).getTimezoneOffset() * 60; // affiche l'heure locale
+  const CHARTS = new Map();
+  const PERIODS = { "5J": null, "1M": 31, "3M": 92, "6M": 183, "YTD": "ytd", "1A": 366, "5A": 99999 };
+  const cut = (daily, p) => {
+    if (!daily.length) return daily;
+    const last = new Date(daily[daily.length - 1][0] + "T00:00:00Z");
+    let lim;
+    if (p === "ytd") lim = `${last.getUTCFullYear() - 1}-12-31`;
+    else { const d = new Date(last); d.setUTCDate(d.getUTCDate() - p); lim = d.toISOString().slice(0, 10); }
+    const i = daily.findIndex((x) => x[0] >= lim);
+    return daily.slice(Math.max(0, i - (p === "ytd" ? 1 : 0)));
+  };
+
+  /** Monte un graphe dans `el`. opts : points [[t,v]], fmt, log, kind ('area'|'baseline'), base, lines */
+  function mount(key, el, opts) {
+    const old = CHARTS.get(key); if (old) { old.chart.remove(); CHARTS.delete(key); }
+    el.innerHTML = '<div class="legend"></div>';
+    if (!LWC || !opts.points.length) { el.insertAdjacentHTML("beforeend", '<p class="empty" style="padding-top:40px">Graphe indisponible.</p>'); return; }
+    const intraday = typeof opts.points[0][0] === "number";
+    const line = css("--line"), text = css("--muted"), border = css("--border"), up = css("--up"), down = css("--down");
+    const chart = LWC.createChart(el, {
+      autoSize: true,
+      layout: { background: { type: "solid", color: "transparent" }, textColor: text, fontFamily: "Inter, system-ui, sans-serif", fontSize: 11 },
+      grid: { vertLines: { visible: false }, horzLines: { color: alpha(border.length === 7 ? border : "#e4e4df", .9) } },
+      rightPriceScale: { borderVisible: false, mode: opts.log ? LWC.PriceScaleMode.Logarithmic : LWC.PriceScaleMode.Normal, scaleMargins: { top: .14, bottom: .06 } },
+      timeScale: { borderVisible: false, timeVisible: intraday, secondsVisible: false, rightOffset: 1, lockVisibleTimeRangeOnResize: true },
+      crosshair: { mode: LWC.CrosshairMode.Magnet, vertLine: { color: text, labelBackgroundColor: line }, horzLine: { color: text, labelBackgroundColor: line } },
+      localization: { locale: "fr-FR", priceFormatter: opts.fmt },
+      handleScroll: { vertTouchDrag: false }, handleScale: { axisPressedMouseMove: { price: false } },
+    });
+    const priceFormat = { type: "custom", formatter: opts.fmt, minMove: opts.minMove || 0.000001 };
+    const series = opts.kind === "baseline"
+      ? chart.addBaselineSeries({ baseValue: { type: "price", price: opts.base }, topLineColor: up, bottomLineColor: down,
+          topFillColor1: alpha(up, .25), topFillColor2: alpha(up, .02), bottomFillColor1: alpha(down, .02), bottomFillColor2: alpha(down, .25),
+          lineWidth: 2, priceFormat, priceLineVisible: false })
+      : chart.addAreaSeries({ lineColor: line, topColor: alpha(line, .22), bottomColor: alpha(line, 0), lineWidth: 2, priceFormat, priceLineVisible: false,
+          crosshairMarkerRadius: 4, crosshairMarkerBorderColor: css("--surface") });
+    const data = [];
+    opts.points.forEach(([t, v]) => { const time = intraday ? tzShift(t) : t; if (!data.length || time > data[data.length - 1].time) data.push({ time, value: v, t }); });
+    series.setData(data.map(({ time, value }) => ({ time, value })));
+    (opts.lines || []).forEach((l) => series.createPriceLine({ price: l.price, color: l.color || text, lineWidth: 1, lineStyle: LWC.LineStyle.Dashed, axisLabelVisible: true, title: l.title || "" }));
+    chart.timeScale().fitContent();
+    const legend = el.querySelector(".legend");
+    const first = data[0].value;
+    const show = (pt) => {
+      if (!pt) return;
+      const t = intraday ? (data.find((d) => d.time === pt.time) || {}).t ?? pt.time : pt.time;
+      const rel = opts.kind === "baseline" ? "" : " " + chg((pt.value / first - 1) * 100);
+      legend.innerHTML = `${esc(fmtDay(t))} · <b class="num">${esc(opts.fmt(pt.value))}</b>${rel}`;
+    };
+    show(data[data.length - 1]);
+    chart.subscribeCrosshairMove((p) => { const v = p.time && p.seriesData.get(series); show(v ? { time: p.time, value: v.value } : data[data.length - 1]); });
+    CHARTS.set(key, { chart, series, opts, el });
+    return { chart, series };
+  }
+
+  const segHtml = (keys, cur, attr = "p") => `<div class="seg sm">${keys.map((k) => `<button data-${attr}="${k}" aria-pressed="${k === cur}">${k}</button>`).join("")}</div>`;
+  const periodPerf = (pts) => pts.length > 1 ? (pts[pts.length - 1][1] / pts[0][1] - 1) * 100 : null;
+
+  /* Carte graphe d'un actif (CAC 40, S&P 500, explorateur) */
+  const state = { feat: {}, explorer: store.get("vfi-explorer") || "", expP: "1A", log: false };
+  function assetPoints(a, p) { return p === "5J" ? (a.intraday || []) : cut(a.daily, PERIODS[p]); }
+  function drawAssetCard(key, el, a, p, tall, withPicker) {
+    const pts = assetPoints(a, p);
+    const fmt = assetFmt(a);
+    const picker = withPicker ? `<select class="pick" id="exp-pick" aria-label="Actif">${[...new Set(assets.map((x) => x.category))].map((c) =>
+      `<optgroup label="${esc(c)}">${assets.filter((x) => x.category === c).map((x) => `<option value="${esc(x.symbol)}"${x.symbol === a.symbol ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</optgroup>`).join("")}</select>` : `<h2>${esc(a.name)}</h2>`;
+    el.innerHTML = `<div class="card-head"><div>${picker}<div class="cat">${esc(a.category)} · ${esc(a.symbol)}${a.stale ? " · données de la veille" : ""}</div></div>
+        <div class="ctrls">${segHtml(Object.keys(PERIODS), p)}${withPicker ? `<button class="toggle" id="log" aria-pressed="${state.log}" title="Échelle logarithmique">Log</button>` : ""}</div></div>
+      <div class="price-big"><span class="num" data-live-price="${esc(a.symbol)}">${esc(fmt(a.price))}</span>
+        <span data-live-chg="${esc(a.symbol)}">${chg(a.perf?.["1J"])} <small class="src">${a.live ? "24 h" : "1 jour"}</small></span>
+        <span class="src">${esc(p)} : ${chg(periodPerf(pts))}</span></div>
+      <div class="chart${tall ? " tall" : ""}"></div>`;
+    mount(key, el.querySelector(".chart"), { points: pts, fmt, log: withPicker && state.log, symbol: a.symbol, intraday: p === "5J" });
+    el.querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => {
+      if (withPicker) state.expP = b.dataset.p; else state.feat[a.symbol] = b.dataset.p;
+      drawAssetCard(key, el, a, b.dataset.p, tall, withPicker);
+    }));
+    if (withPicker) {
+      $("exp-pick").addEventListener("change", (e) => showExplorer(e.target.value));
+      $("log").addEventListener("click", () => { state.log = !state.log; drawAssetCard(key, el, a, p, tall, withPicker); });
+    }
+  }
+  const featured = ["^FCHI", "^GSPC"].map((s) => bySym[s]).filter(Boolean);
+  function drawFeatured() {
+    $("featured").innerHTML = featured.map((a, i) => `<div class="card" id="feat-${i}"></div>`).join("");
+    featured.forEach((a, i) => drawAssetCard("feat-" + i, $("feat-" + i), a, state.feat[a.symbol] || "1A", false, false));
+  }
+  function showExplorer(sym, scroll) {
+    const a = bySym[sym] || assets.find((x) => !featured.includes(x)) || assets[0];
+    if (!a) return;
+    state.explorer = a.symbol; store.set("vfi-explorer", a.symbol);
+    drawAssetCard("explorer", $("explorer"), a, state.expP, true, true);
+    if (scroll) $("explorer").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  /* ------------------------------------------------------------------ bandeau + résumé */
+  function goAsset(sym) { setView("marches"); setTimeout(() => showExplorer(sym, true), 30); }
+  function drawTicker() {
+    const items = assets.map((a) => `<button class="tk" data-sym="${esc(a.symbol)}"><span class="n">${a.live ? '<i class="lv" title="En direct"></i>' : ""}${esc(a.name)}</span>
+      <span class="p num">${esc(assetFmt(a)(a.price))}</span>${chg(a.perf?.["1J"])}</button>`);
+    $("ticker").innerHTML = items.join("");
+  }
+  $("ticker").addEventListener("click", (e) => { const b = e.target.closest(".tk"); if (b) goAsset(b.dataset.sym); });
+
+  function drawSummary() {
+    const tile = (label, value, sub, extra = "") => `<div class="stat"><small>${label}</small><b class="num">${value}</b><div class="sub">${sub}</div>${extra}</div>`;
+    const t = [];
+    const g = crypto.global;
+    if (g) t.push(tile("Capitalisation crypto", esc(compact(g.mcap)), `${chg(g.mcap_change_24h)} sur 24 h`));
+    if (g?.dominance?.btc != null) t.push(tile("Dominance BTC", nf(1).format(g.dominance.btc) + " %", g.dominance.eth != null ? "ETH " + nf(1).format(g.dominance.eth) + " %" : ""));
+    const f = crypto.fng && crypto.fng[crypto.fng.length - 1];
+    if (f) t.push(tile("Fear &amp; Greed crypto", `${f[1]}<span style="font-size:13px;color:var(--muted);font-weight:500"> / 100</span>`, esc(fngLabel(f[1])), `<div class="gauge"><i style="left:${f[1]}%"></i></div>`));
+    if (stables.total) t.push(tile("Stablecoins", esc(compact(stables.total)), `${chg(stables.total_ch7d)} sur 7 jours`));
+    const tvl = crypto.tvl && crypto.tvl[crypto.tvl.length - 1];
+    if (tvl) t.push(tile("TVL DeFi", esc(compact(tvl[1])), crypto.tvl.length > 31 ? chg((tvl[1] / crypto.tvl[crypto.tvl.length - 31][1] - 1) * 100) + " sur 30 jours" : ""));
+    t.push(tile("Actualités", String(DATA.stats?.new || 0), `nouvelles depuis hier · ${DATA.stats?.news || 0} au total`));
+    $("summary").innerHTML = t.join("");
+
+    const mv = (list) => list.length ? list.map((m) => `<div class="mv" data-sym="${esc(m.symbol || "")}" data-gecko="${esc(m.gecko || "")}"><span>${esc(m.name)}<small>${esc(m.kind)}</small></span>${chg(m.ch)}</div>`).join("") : '<p class="ok">Rien de notable.</p>';
+    const mvs = DATA.movers || { up: [], down: [] };
+    const alerts = DATA.alerts || [];
+    const newN = DATA.stats?.new || 0;
+    const fresh = themes.flatMap((t) => t.news.filter((n) => n.new).map((n) => ({ ...n, theme: t.name }))).slice(0, 3);
+    $("day").innerHTML = `<div class="box"><h3>▲ Plus fortes hausses</h3>${mv(mvs.up)}</div>
+      <div class="box"><h3>▼ Plus fortes baisses</h3>${mv(mvs.down)}</div>
+      <div class="box"><h3>Depuis hier</h3>
+        ${alerts.length ? alerts.map((a) => `<div class="mv" data-view="stables"><span>⚠ ${esc(a.name)} décroche<small>ancrage ${esc(a.peg)}</small></span><span class="chg num down">${pct(a.deviation, 2)}</span></div>`).join("") : '<div class="mv" data-view="stables"><span>✓ Stablecoins : ancrages tenus</span><small>±0,5 %</small></div>'}
+        <div class="mv" data-view="actus"><span>${newN} nouvel${newN > 1 ? "les" : "le"} actualité${newN > 1 ? "s" : ""}</span><small>voir →</small></div>
+        ${fresh.map((n) => `<a class="mv" href="${esc(n.url)}" target="_blank" rel="noopener"><span>${esc(n.title)}</span><small>${esc(n.theme)}</small></a>`).join("")}
+      </div>`;
+  }
+  $("day").addEventListener("click", (e) => {
+    const m = e.target.closest(".mv"); if (!m || m.tagName === "A") return;
+    if (m.dataset.view) return setView(m.dataset.view);
+    if (m.dataset.sym && bySym[m.dataset.sym]) return goAsset(m.dataset.sym);
+    if (m.dataset.gecko) { setView("crypto"); $("q").value = m.querySelector("span").firstChild.textContent; drawCurrent(); }
+  });
+
+  /* ------------------------------------------------------------------ tableaux triables */
+  const sorts = {};
+  function table(id, cols, rows, opts = {}) {
+    const s = sorts[id] || opts.sort || {};
+    const col = cols.find((c) => c.key === s.key);
+    if (col) rows = [...rows].sort((a, b) => {
+      const x = col.val(a), y = col.val(b);
+      if (x == null) return 1; if (y == null) return -1;
+      return (typeof x === "string" ? x.localeCompare(y, "fr") : x - y) * (s.dir === "asc" ? 1 : -1);
+    });
+    $(id).innerHTML = `<thead><tr>${cols.map((c) => `<th data-k="${c.key}" class="${c.opt ? "opt" : ""}"${s.key === c.key ? ` aria-sort="${s.dir === "asc" ? "ascending" : "descending"}"` : ""}>${c.label}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map((r) => `<tr data-id="${esc(opts.rowId(r))}" class="${opts.rowClass ? opts.rowClass(r) : ""}">${cols.map((c) => `<td class="${c.opt ? "opt" : ""}">${c.html(r)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    $(id).querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
+      const k = th.dataset.k, cur = sorts[id] || opts.sort || {};
+      sorts[id] = { key: k, dir: cur.key === k && cur.dir === "desc" ? "asc" : "desc" };
+      opts.redraw();
+    }));
+    return rows.length;
+  }
+  const spark = (vals) => {
+    if (!vals || vals.length < 2) return "";
+    const w = 96, h = 28, min = Math.min(...vals), max = Math.max(...vals), r = max - min || 1;
+    const pts = vals.map((v, i) => `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 2 - (v - min) / r * (h - 4)).toFixed(1)}`).join(" ");
+    const c = vals[vals.length - 1] >= vals[0] ? "var(--up)" : "var(--down)";
+    return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  };
+  const q = () => $("q").value.trim().toLowerCase();
+
+  /* Marchés */
+  let cat = "Toutes";
+  const cats = ["Toutes", ...new Set(assets.map((a) => a.category))];
+  $("cat-chips").innerHTML = cats.map((c) => `<button class="chip" data-c="${esc(c)}" aria-pressed="${c === cat}">${esc(c)}</button>`).join("");
+  $("cat-chips").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; cat = b.dataset.c;
+    $("cat-chips").querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", x.dataset.c === cat)); drawPerf(); });
+  function drawPerf() {
+    const rows = assets.filter((a) => (cat === "Toutes" || a.category === cat) && (!q() || (a.name + " " + a.symbol + " " + a.category).toLowerCase().includes(q())));
+    const pc = (k, opt) => ({ key: k, label: k, opt, val: (a) => a.perf?.[k], html: (a) => chg(a.perf?.[k]) });
+    const n = table("perf-table", [
+      { key: "name", label: "Actif", val: (a) => a.name, html: (a) => `<div class="nm"><div><b>${esc(a.name)}</b> ${a.live ? '<i class="lv" title="En direct"></i>' : ""}<br><small>${esc(a.category)}</small></div></div>` },
+      { key: "price", label: "Cours", val: (a) => a.price, html: (a) => `<span class="num">${esc(assetFmt(a)(a.price))}</span>` },
+      pc("1J"), pc("1S"), pc("1M"), pc("YTD", true), pc("1A"), pc("5A", true),
+      { key: "spark", label: "1 mois", opt: true, val: (a) => a.perf?.["1M"], html: (a) => spark(cut(a.daily, 31).map((x) => x[1])) },
+    ], rows, { rowId: (a) => a.symbol, redraw: drawPerf });
+    $("perf-none").hidden = n > 0;
+  }
+  $("perf-table").addEventListener("click", (e) => { const tr = e.target.closest("tbody tr"); if (tr) showExplorer(tr.dataset.id, true); });
+
+  /* Crypto */
+  let fngP = "1A", tvlP = "1A";
+  function drawCryptoStatic() {
+    const g = crypto.global || {};
+    const f = crypto.fng && crypto.fng[crypto.fng.length - 1];
+    const tvl = crypto.tvl && crypto.tvl[crypto.tvl.length - 1];
+    const tile = (l, v, s, x = "") => `<div class="stat"><small>${l}</small><b class="num">${v}</b><div class="sub">${s}</div>${x}</div>`;
+    $("crypto-stats").innerHTML = [
+      tile("Capitalisation totale", esc(compact(g.mcap)), chg(g.mcap_change_24h) + " sur 24 h"),
+      tile("Volume 24 h", esc(compact(g.volume)), g.coins ? nf(0).format(g.coins) + " cryptos actives" : ""),
+      tile("Dominance BTC", g.dominance ? nf(1).format(g.dominance.btc) + " %" : "–", g.dominance?.eth != null ? "ETH " + nf(1).format(g.dominance.eth) + " %" : ""),
+      tile("Fear &amp; Greed", f ? f[1] + " / 100" : "–", f ? esc(fngLabel(f[1])) : "", f ? `<div class="gauge"><i style="left:${f[1]}%"></i></div>` : ""),
+      tile("TVL DeFi", tvl ? esc(compact(tvl[1])) : "–", tvl && crypto.tvl.length > 31 ? chg((tvl[1] / crypto.tvl[crypto.tvl.length - 31][1] - 1) * 100) + " sur 30 j" : ""),
+    ].join("");
+    drawFng(); drawTvl();
+    const dom = Object.entries(g.dominance || {});
+    if (dom.length) {
+      const other = Math.max(0, 100 - dom.reduce((s, [, v]) => s + v, 0));
+      $("dom-card").innerHTML = `<div class="card-head"><div><h2>Dominance du marché</h2><div class="cat">Part de chaque crypto dans la capitalisation totale (CoinGecko).</div></div></div>
+        <div class="bars">${[...dom, ["autres", other]].map(([k, v]) => `<div class="bar"><span class="mono">${esc(k.toUpperCase())}</span><span class="tr"><i style="width:${Math.min(100, v)}%"></i></span><span class="num">${nf(1).format(v)} %</span></div>`).join("")}</div>`;
+    } else $("dom-card").hidden = true;
+  }
+  function drawFng() {
+    const all = crypto.fng || [];
+    const pts = cut(all, { "3M": 92, "1A": 366, "2A": 731 }[fngP]);
+    const last = all[all.length - 1];
+    $("fng-card").innerHTML = `<div class="card-head"><div><h2>Fear &amp; Greed</h2><div class="cat">Sentiment du marché crypto, 0 = peur extrême, 100 = avidité extrême.</div></div>${segHtml(["3M", "1A", "2A"], fngP)}</div>
+      ${last ? `<div class="price-big"><span class="num">${last[1]}</span><span class="src">${esc(fngLabel(last[1]))}</span></div>` : ""}<div class="chart"></div>
+      <div class="src">Source : <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener">alternative.me</a></div>`;
+    mount("fng", $("fng-card").querySelector(".chart"), { points: pts, fmt: (v) => Math.round(v) + " · " + fngLabel(v), kind: "baseline", base: 50, minMove: 1 });
+    $("fng-card").querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => { fngP = b.dataset.p; drawFng(); }));
+  }
+  function drawTvl() {
+    const pts = cut(crypto.tvl || [], PERIODS[tvlP]);
+    $("tvl-card").innerHTML = `<div class="card-head"><div><h2>TVL DeFi</h2><div class="cat">Valeur totale déposée dans la finance décentralisée, toutes chaînes.</div></div>${segHtml(["3M", "1A", "5A"], tvlP)}</div>
+      <div class="price-big"><span class="num">${esc(compact(pts.length ? pts[pts.length - 1][1] : null))}</span><span class="src">${tvlP} : ${chg(periodPerf(pts))}</span></div><div class="chart"></div>
+      <div class="src">Source : <a href="https://defillama.com" target="_blank" rel="noopener">DefiLlama</a></div>`;
+    mount("tvl", $("tvl-card").querySelector(".chart"), { points: pts, fmt: (v) => compact(v), minMove: 1 });
+    $("tvl-card").querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => { tvlP = b.dataset.p; drawTvl(); }));
+  }
+  function drawCryptoTable() {
+    const rows = (crypto.top || []).filter((c) => !q() || (c.name + " " + c.symbol).toLowerCase().includes(q()));
+    const pc = (k, label, opt) => ({ key: k, label, opt, val: (c) => c[k], html: (c) => chg(c[k]) });
+    const n = table("crypto-table", [
+      { key: "rank", label: "Crypto", val: (c) => -c.rank, html: (c) => `<div class="nm"><span class="rk">${c.rank ?? ""}</span>${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy">` : ""}<div><b>${esc(c.name)}</b><br><small>${esc(c.symbol)}</small></div></div>` },
+      { key: "price", label: "Prix", val: (c) => c.price, html: (c) => `<span class="num">${esc(usd(c.price))}</span>` },
+      pc("ch1h", "1 h", true), pc("ch24h", "24 h"), pc("ch7d", "7 j"), pc("ch30d", "30 j", true), pc("ch1y", "1 an", true),
+      { key: "mcap", label: "Capi.", val: (c) => c.mcap, html: (c) => `<span class="num">${esc(compact(c.mcap))}</span>` },
+      { key: "volume", label: "Volume 24 h", opt: true, val: (c) => c.volume, html: (c) => `<span class="num">${esc(compact(c.volume))}</span>` },
+      { key: "spark", label: "7 jours", opt: true, val: (c) => c.ch7d, html: (c) => spark(c.spark) },
+    ], rows, { rowId: (c) => c.id, redraw: drawCryptoTable, sort: { key: "rank", dir: "desc" } });
+    $("crypto-none").hidden = n > 0;
+  }
+  $("crypto-table").addEventListener("click", (e) => {
+    const tr = e.target.closest("tbody tr"); if (!tr) return;
+    const a = assets.find((x) => x.gecko === tr.dataset.id);
+    if (a) goAsset(a.symbol); else window.open("https://www.coingecko.com/fr/pi%C3%A8ces/" + encodeURIComponent(tr.dataset.id), "_blank", "noopener");
+  });
+
+  /* Stablecoins */
+  let stP = "1A", pegId = null, pegP = "3M";
+  function drawStableStatic() {
+    const top = stables.top || [];
+    const usdt = top.find((s) => s.symbol === "USDT");
+    const alerts = top.filter((s) => s.alert);
+    const tile = (l, v, s) => `<div class="stat"><small>${l}</small><b class="num">${v}</b><div class="sub">${s}</div></div>`;
+    $("stable-stats").innerHTML = [
+      tile("Capitalisation totale", esc(compact(stables.total)), `${stables.count || "–"} stablecoins suivis`),
+      tile("Variation 7 jours", pct(stables.total_ch7d), "offre en circulation"),
+      tile("Variation 30 jours", pct(stables.total_ch30d), "offre en circulation"),
+      tile("Part de l'USDT", usdt?.share != null ? nf(1).format(usdt.share) + " %" : "–", usdt ? "USDC " + nf(1).format(top.find((s) => s.symbol === "USDC")?.share ?? 0) + " %" : ""),
+      tile("Décrochages", alerts.length ? `<span class="down">${alerts.length}</span>` : '<span class="up">0</span>', alerts.length ? esc(alerts.map((a) => a.symbol).join(", ")) : "ancrages tenus à ±0,5 %"),
+    ].join("");
+    $("alert-n").hidden = !alerts.length; $("alert-n").textContent = alerts.length;
+    drawStableChart();
+    pegId = pegId || (alerts[0] || top[0] || {}).gecko;
+    drawPeg();
+  }
+  function drawStableChart() {
+    const pts = cut(stables.history || [], PERIODS[stP]);
+    $("stable-chart").innerHTML = `<div class="card-head"><div><h2>Capitalisation des stablecoins</h2><div class="cat">Toutes monnaies d'ancrage confondues, en dollars.</div></div>${segHtml(["3M", "6M", "1A", "5A"], stP)}</div>
+      <div class="price-big"><span class="num">${esc(compact(stables.total))}</span><span class="src">${stP} : ${chg(periodPerf(pts))}</span></div><div class="chart tall"></div>
+      <div class="src">Source : <a href="https://defillama.com/stablecoins" target="_blank" rel="noopener">DefiLlama</a></div>`;
+    mount("stables", $("stable-chart").querySelector(".chart"), { points: pts, fmt: (v) => compact(v), minMove: 1 });
+    $("stable-chart").querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => { stP = b.dataset.p; drawStableChart(); }));
+  }
+  function drawStableTable() {
+    const rows = (stables.top || []).filter((s) => !q() || (s.name + " " + s.symbol + " " + s.peg).toLowerCase().includes(q()));
+    const pc = (k, label, opt) => ({ key: k, label, opt, val: (s) => s[k], html: (s) => chg(s[k]) });
+    const n = table("stable-table", [
+      { key: "name", label: "Stablecoin", val: (s) => s.name, html: (s) => `<div class="nm"><div><b>${esc(s.symbol)}</b> ${s.alert ? '<span class="tag warn">⚠ décroché</span>' : ""}<br><small>${esc(s.name)}</small></div></div>` },
+      { key: "peg", label: "Ancrage", val: (s) => s.peg, html: (s) => `<span class="tag">${esc(s.peg)}</span>` },
+      { key: "mechanism", label: "Mécanisme", opt: true, val: (s) => s.mechanism, html: (s) => `<small>${esc({ "fiat-backed": "Réserves fiat", "crypto-backed": "Collatéral crypto", algorithmic: "Algorithmique" }[s.mechanism] || s.mechanism || "–")}</small>` },
+      { key: "price", label: "Prix", val: (s) => s.price, html: (s) => `<span class="num">${s.price != null ? nf(4).format(s.price) + " $" : "–"}</span>` },
+      { key: "deviation", label: "Écart", val: (s) => s.deviation == null ? null : Math.abs(s.deviation), html: (s) => s.deviation == null ? "–" : `<span class="chg num ${s.alert ? "down" : "flat"}">${(s.deviation > 0 ? "+" : "") + nf(2).format(s.deviation)} %</span>` },
+      { key: "mcap", label: "Capi.", val: (s) => s.mcap, html: (s) => `<span class="num">${esc(compact(s.mcap))}</span>` },
+      { key: "share", label: "Part", opt: true, val: (s) => s.share, html: (s) => s.share != null ? nf(1).format(s.share) + " %" : "–" },
+      pc("ch1d", "24 h", true), pc("ch7d", "7 j"), pc("ch30d", "30 j", true),
+    ], rows, { rowId: (s) => s.gecko || s.id, rowClass: (s) => s.alert ? "alert" : "", redraw: drawStableTable, sort: { key: "mcap", dir: "desc" } });
+    $("stable-none").hidden = n > 0;
+  }
+  $("stable-table").addEventListener("click", (e) => { const tr = e.target.closest("tbody tr"); if (!tr) return; pegId = tr.dataset.id; drawPeg(); $("peg-card").scrollIntoView({ behavior: "smooth", block: "center" }); });
+  function drawPeg() {
+    const hist = stables.peg_history || {};
+    const list = (stables.top || []).filter((s) => hist[s.gecko]);
+    if (!list.length) { $("peg-card").hidden = true; return; }
+    if (!hist[pegId]) pegId = list[0].gecko;
+    const s = list.find((x) => x.gecko === pegId);
+    const pts = cut(hist[pegId], { "1M": 31, "3M": 92, "1A": 366 }[pegP]);
+    const lo = Math.min(...pts.map((p) => p[1])), hi = Math.max(...pts.map((p) => p[1]));
+    $("peg-card").innerHTML = `<div class="card-head"><div><h2>Ancrage : ${esc(s.symbol)}</h2><div class="cat">Prix ramené à sa monnaie d'ancrage (1,0000 = parité). Pointillés : seuils ±0,5 %.</div></div>
+        <div class="ctrls"><select class="pick" id="peg-pick" aria-label="Stablecoin">${list.map((x) => `<option value="${esc(x.gecko)}"${x.gecko === pegId ? " selected" : ""}>${esc(x.symbol)} · ${esc(x.name)}</option>`).join("")}</select>${segHtml(["1M", "3M", "1A"], pegP)}</div></div>
+      <div class="price-big"><span class="num">${pts.length ? nf(4).format(pts[pts.length - 1][1]) : "–"}</span><span class="src">${pegP} : min ${nf(4).format(lo)} · max ${nf(4).format(hi)}</span></div>
+      <div class="chart"></div>`;
+    mount("peg", $("peg-card").querySelector(".chart"), { points: pts, fmt: (v) => nf(4).format(v), kind: "baseline", base: 1, minMove: 0.0001,
+      lines: [{ price: 1.005, title: "+0,5 %" }, { price: 0.995, title: "−0,5 %" }] });
+    $("peg-pick").addEventListener("change", (e) => { pegId = e.target.value; drawPeg(); });
+    $("peg-card").querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => { pegP = b.dataset.p; drawPeg(); }));
+  }
+
+  /* Actualités */
+  let theme = "Toutes";
+  const newTotal = themes.reduce((n, t) => n + (t.new_count || 0), 0);
+  $("new-n").hidden = !newTotal; $("new-n").textContent = newTotal;
+  $("theme-chips").innerHTML = ["Toutes", ...themes.map((t) => t.name)].map((c) => `<button class="chip" data-c="${esc(c)}" aria-pressed="${c === theme}">${esc(c)}</button>`).join("");
+  $("theme-chips").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (!b) return; theme = b.dataset.c;
+    $("theme-chips").querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", x.dataset.c === theme)); drawNews(); });
+  const hl = (s, term) => { const e = esc(s); if (!term) return e; const i = e.toLowerCase().indexOf(esc(term)); return i < 0 ? e : e.slice(0, i) + "<mark>" + e.slice(i, i + esc(term).length) + "</mark>" + e.slice(i + esc(term).length); };
+  function drawNews() {
+    const term = q();
+    const cards = themes.filter((t) => theme === "Toutes" || t.name === theme).map((t) => {
+      const items = t.news.filter((n) => !term || (n.title + " " + (n.source || "")).toLowerCase().includes(term));
+      if (term && !items.length) return "";
+      return `<article class="card"><div class="card-head"><div><h2>${esc(t.name)}</h2><div class="cat">${t.news_count} article${t.news_count > 1 ? "s" : ""} retenu${t.news_count > 1 ? "s" : ""} sur 7 jours</div></div>
+          ${t.new_count ? `<span class="badge-new">${t.new_count} nouveau${t.new_count > 1 ? "x" : ""}</span>` : ""}</div>
+        ${items.length ? `<ul class="news">${items.map((n) => `<li><a href="${esc(n.url)}" target="_blank" rel="noopener"><div class="t">${hl(n.title, term)}</div>
+          <div class="meta">${n.new ? '<span class="nw">Nouveau</span>·' : ""}<span class="lg">${esc((n.lang || "").toUpperCase())}</span><span>${esc(n.source || "")}</span>${n.date ? `<span>· ${esc(ago(n.date))}</span>` : ""}</div></a></li>`).join("")}</ul>`
+          : '<p class="empty">Pas d\'actualité notable cette semaine.</p>'}</article>`;
+    }).join("");
+    $("news-grid").innerHTML = cards;
+    $("news-none").hidden = !!cards;
+  }
+
+  /* ------------------------------------------------------------------ vues */
+  const VIEWS = { marches: "Rechercher un actif (CAC 40, or, EUR/USD…)", crypto: "Rechercher une crypto (BTC, Solana…)", stables: "Rechercher un stablecoin (USDC, EURC…)", actus: "Rechercher dans les titres et les médias…" };
+  let view = (location.hash.slice(1) in VIEWS) ? location.hash.slice(1) : (store.get("vfi-view") in VIEWS ? store.get("vfi-view") : "marches");
+  const drawn = {};
+  function drawView(v, force) {
+    if (v === "marches") { if (!drawn.marches || force) { drawFeatured(); showExplorer(state.explorer); } drawPerf(); }
+    if (v === "crypto") { if (!drawn.crypto || force) drawCryptoStatic(); drawCryptoTable(); }
+    if (v === "stables") { if (!drawn.stables || force) drawStableStatic(); drawStableTable(); }
+    if (v === "actus") drawNews();
+    drawn[v] = true;
+  }
+  const drawCurrent = () => drawView(view);
+  function setView(v) {
+    if (v !== view) $("q").value = "";
+    view = v; store.set("vfi-view", v);
+    $("tabs").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === v));
+    document.querySelectorAll("section.view").forEach((s) => s.classList.toggle("on", s.id === "v-" + v));
+    $("q").placeholder = VIEWS[v];
+    history.replaceState(null, "", "#" + v);
+    drawView(v);
+  }
+  $("tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setView(b.dataset.v); });
+  $("q").addEventListener("input", drawCurrent);
+  window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (v in VIEWS && v !== view) setView(v); });
+
+  /* Thème clair / sombre */
+  $("theme").addEventListener("click", () => {
+    const dark = getComputedStyle(document.documentElement).colorScheme.includes("dark");
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next; store.set("vfi-theme", next);
+    Object.keys(drawn).forEach((k) => { drawn[k] = false; });
+    drawView(view, true);
+  });
+
+  /* ------------------------------------------------------------------ prix en direct (CoinGecko, sans clé) */
+  const liveIds = [...new Set([...(crypto.top || []).map((c) => c.id), ...assets.filter((a) => a.gecko).map((a) => a.gecko)])];
+  async function refreshLive() {
+    if (!liveIds.length) return;
+    try {
+      const r = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=100&price_change_percentage=1h,24h,7d,30d,1y&ids=" + liveIds.join(","));
+      if (!r.ok) throw new Error(r.status);
+      const rows = await r.json();
+      const by = Object.fromEntries(rows.map((c) => [c.id, c]));
+      (crypto.top || []).forEach((c) => { const x = by[c.id]; if (!x) return;
+        Object.assign(c, { price: x.current_price, mcap: x.market_cap, volume: x.total_volume, ch1h: x.price_change_percentage_1h_in_currency,
+          ch24h: x.price_change_percentage_24h_in_currency, ch7d: x.price_change_percentage_7d_in_currency,
+          ch30d: x.price_change_percentage_30d_in_currency, ch1y: x.price_change_percentage_1y_in_currency }); });
+      assets.forEach((a) => { const x = a.gecko && by[a.gecko]; if (!x || (a.currency && a.currency !== "USD")) return;
+        a.price = x.current_price; a.perf = { ...a.perf, "1J": x.price_change_percentage_24h_in_currency }; a.live = true;
+        document.querySelectorAll(`[data-live-price="${CSS.escape(a.symbol)}"]`).forEach((el) => { el.textContent = assetFmt(a)(a.price); });
+        document.querySelectorAll(`[data-live-chg="${CSS.escape(a.symbol)}"]`).forEach((el) => { el.innerHTML = chg(a.perf["1J"]) + ' <small class="src">24 h</small>'; });
+        CHARTS.forEach((c, key) => { if (c.opts.symbol === a.symbol && c.opts.intraday) { try { c.series.update({ time: tzShift(Math.floor(Date.now() / 1000)), value: a.price }); } catch (e) {} } });
+      });
+      drawTicker(); drawSummary();
+      if (view === "crypto") drawCryptoTable();
+      if (view === "marches") drawPerf();
+      $("live").className = "live on";
+      $("live").lastElementChild.textContent = "Direct · " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    } catch (e) {
+      $("live").className = "live";
+      $("live").lastElementChild.textContent = "Direct indisponible";
+    }
+  }
+
+  drawTicker(); drawSummary(); setView(view);
+  refreshLive();
+  setInterval(() => { if (!document.hidden) refreshLive(); }, 90000);
+})();
+</script>
+</body>
+</html>
