@@ -18,7 +18,8 @@ technologique. Aucune clé d'API n'est nécessaire.
 - **Actualités** : Google News FR + EN par thème, filtrées contre publicités, promotions, prédictions
   de cours et communiqués ; badge « Nouveau » pour ce qui n'avait pas été vu la veille.
 - Recherche dans chaque onglet, mode clair / sombre, affichage mobile.
-- **Prix en direct** : dans le navigateur, les prix crypto sont rafraîchis toutes les 90 s (CoinGecko).
+- **Rafraîchissement** : la page se recharge toute seule chaque minute (onglet et position conservés) et
+  les prix crypto sont repris en direct de CoinGecko à chaque chargement.
   Les autres cours (indices, devises, matières premières) datent du dernier passage de la tâche.
 
 ## Fonctionnement

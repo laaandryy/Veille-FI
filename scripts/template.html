@@ -716,7 +716,19 @@ const DATA = /*__DATA__*/null;
 
   drawTicker(); drawSummary(); setView(view);
   refreshLive();
-  setInterval(() => { if (!document.hidden) refreshLive(); }, 90000);
+
+  /* Rechargement complet de la page toutes les minutes (onglet, actif choisi et position conservés). */
+  const RELOAD_MS = 60000;
+  try { const y = sessionStorage.getItem("vfi-scroll"); if (y) { sessionStorage.removeItem("vfi-scroll"); setTimeout(() => window.scrollTo(0, +y), 120); } } catch (e) {}
+  const reload = () => {
+    if (document.hidden || document.activeElement === $("q") && $("q").value) return false;
+    try { sessionStorage.setItem("vfi-scroll", String(window.scrollY)); } catch (e) {}
+    location.reload();
+    return true;
+  };
+  let due = false;
+  setInterval(() => { due = !reload(); }, RELOAD_MS);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && due) reload(); });
 })();
 </script>
 </body>
