@@ -11,6 +11,7 @@ on:
     paths:                      # régénère aussitôt quand la liste ou le script change
       - actifs.csv
       - scripts/**
+      - .github/workflows/veille.yml
   pull_request:                 # sur une PR : génération à blanc, sans commit
     paths:
       - actifs.csv
