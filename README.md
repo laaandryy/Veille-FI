@@ -24,15 +24,40 @@ technologique. Aucune clé d'API n'est nécessaire.
 
 ## Fonctionnement
 
-1. Chaque jour vers 04:17 UTC (passage de secours vers 06:47 UTC), `scripts/veille.py` lit `actifs.csv` et `scripts/sources.json`.
+1. `scripts/publish.sh` relit la version publiée (pour l'historique des nouveautés), puis lance
+   `scripts/veille.py`, qui lit `actifs.csv` et `scripts/sources.json`.
 2. Il interroge CNBC (indices, devises, matières premières), Binance puis CoinGecko (historique crypto),
    la BCE (secours devises), CoinGecko (marché crypto), DefiLlama (stablecoins, TVL),
    alternative.me (Fear & Greed) et Google News (actualités). Yahoo Finance sert de dernier recours.
-3. Il génère `index.html` et `data/veille.json` puis les pousse sur `main`.
    Si une source est indisponible, les données du passage précédent sont conservées.
+3. Il génère le site dans `_site/` (non versionné) et le publie sur la branche **`gh-pages`**,
+   en un seul commit remplacé à chaque passage : le dépôt ne grossit pas.
 
-Lancement manuel : onglet **Actions** → **veille** → **Run workflow**.
-Modifier `actifs.csv` ou `scripts/` sur `main` relance aussi la génération.
+GitHub Pages sert la branche `gh-pages` (Settings → Pages → Branch : `gh-pages` / root).
+
+### Publication horaire depuis le lab
+
+1. Sur le lab, créez une clé SSH dédiée : `ssh-keygen -t ed25519 -f ~/.ssh/veille-fi -N ""`.
+2. Ajoutez `~/.ssh/veille-fi.pub` au dépôt : Settings → Deploy keys → Add deploy key,
+   en cochant **Allow write access**.
+3. Clonez avec cette clé et installez la tâche :
+
+   ```bash
+   GIT_SSH_COMMAND="ssh -i ~/.ssh/veille-fi -o IdentitiesOnly=yes" \
+     git clone git@github.com:laaandryy/Veille-FI.git ~/veille-fi
+   git -C ~/veille-fi config core.sshCommand "ssh -i ~/.ssh/veille-fi -o IdentitiesOnly=yes"
+   bash ~/veille-fi/lab/install.sh
+   ```
+
+   `install.sh` vérifie les prérequis (git, Python 3.10+, flock), ajoute une ligne crontab
+   (toutes les heures à hh:07, `MINUTE=23` pour changer), lance un premier passage et écrit le journal
+   dans `~/.local/state/veille-fi.log`. Chaque passage récupère d'abord les modifications de `main`.
+
+### Secours GitHub Actions
+
+Le workflow `.github/workflows/veille.yml` publie aussi chaque jour vers 04:17 et 06:47 UTC, et à chaque
+modification de `actifs.csv` ou `scripts/` sur `main`. Lancement manuel : **Actions** → **veille** → **Run workflow**.
+Sur une PR, il génère le site à blanc et le joint en artefact.
 
 ## Ajouter un actif
 
@@ -52,7 +77,7 @@ Les thèmes (requêtes FR / EN et termes devant figurer dans le titre) et les fi
 ## En local
 
 ```bash
-python3 scripts/veille.py   # Python 3.10+, aucune dépendance
+python3 scripts/veille.py   # Python 3.10+, aucune dépendance ; résultat dans _site/
 ```
 
 Informations fournies à titre indicatif, sans valeur de conseil en investissement.

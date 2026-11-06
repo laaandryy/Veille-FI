@@ -21,6 +21,7 @@ import html
 import http.cookiejar
 import json
 import math
+import os
 import re
 import sys
 import time
@@ -37,8 +38,10 @@ ROOT = Path(__file__).resolve().parent.parent
 CSV_PATH = ROOT / "actifs.csv"
 SOURCES_PATH = ROOT / "scripts" / "sources.json"
 TEMPLATE_PATH = ROOT / "scripts" / "template.html"
-DATA_PATH = ROOT / "data" / "veille.json"
-OUT_PATH = ROOT / "index.html"
+# Dossier de sortie (index.html + data/veille.json) : VEILLE_OUT, par défaut _site/ (non versionné).
+OUT_DIR = Path(os.environ.get("VEILLE_OUT") or ROOT / "_site")
+DATA_PATH = OUT_DIR / "data" / "veille.json"
+OUT_PATH = OUT_DIR / "index.html"
 
 NOW = datetime.now(timezone.utc)
 NEWS_WINDOW_DAYS = 7        # actualités plus anciennes ignorées
@@ -681,7 +684,7 @@ def main() -> int:
             "stale": [a["name"] for a in assets if a.get("stale")],
         },
     }
-    DATA_PATH.parent.mkdir(exist_ok=True)
+    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     DATA_PATH.write_text(json.dumps({**payload, "history": history}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     OUT_PATH.write_text(render(payload), encoding="utf-8")
     log(f"OK : {payload['stats']} · {len(OUT_PATH.read_bytes()) / 1024:.0f} Ko")
