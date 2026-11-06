@@ -24,7 +24,7 @@ technologique. Aucune clé d'API n'est nécessaire.
 
 ## Fonctionnement
 
-1. Chaque jour à 05:00 UTC, `scripts/veille.py` lit `actifs.csv` et `scripts/sources.json`.
+1. Chaque jour vers 04:17 UTC (passage de secours vers 06:47 UTC), `scripts/veille.py` lit `actifs.csv` et `scripts/sources.json`.
 2. Il interroge CNBC (indices, devises, matières premières), Binance puis CoinGecko (historique crypto),
    la BCE (secours devises), CoinGecko (marché crypto), DefiLlama (stablecoins, TVL),
    alternative.me (Fear & Greed) et Google News (actualités). Yahoo Finance sert de dernier recours.

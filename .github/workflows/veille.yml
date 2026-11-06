@@ -4,7 +4,10 @@ name: veille
 # (actifs.csv), puis régénère index.html et le pousse sur main.
 on:
   schedule:
-    - cron: "0 5 * * *"        # tous les jours à 05:00 UTC (6 h/7 h à Paris)
+    # GitHub retarde (parfois de plusieurs heures) ou saute les tâches prévues pile à l'heure,
+    # les plus demandées. On vise donc des minutes moins chargées, avec un passage de secours.
+    - cron: "17 4 * * *"       # tous les jours vers 04:17 UTC (5 h/6 h à Paris)
+    - cron: "47 6 * * *"       # passage de secours vers 06:47 UTC
   workflow_dispatch: {}         # lancement manuel depuis l'onglet Actions
   push:
     branches: [main]
