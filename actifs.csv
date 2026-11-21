@@ -1,0 +1,16 @@
+Nom;Catégorie;Symbole;CNBC;CoinGecko
+CAC 40;Indices;^FCHI;.FCHI;
+S&P 500;Indices;^GSPC;.SPX;
+Nasdaq 100;Indices;^NDX;.NDX;
+Euro Stoxx 50;Indices;^STOXX50E;.STOXX50E;
+DAX;Indices;^GDAXI;.GDAXI;
+Bitcoin;Crypto;BTC-USD;;bitcoin
+Ethereum;Crypto;ETH-USD;;ethereum
+Solana;Crypto;SOL-USD;;solana
+XRP;Crypto;XRP-USD;;ripple
+EUR/USD;Devises;EURUSD=X;EUR=;
+EUR/GBP;Devises;EURGBP=X;EURGBP=;
+EUR/CHF;Devises;EURCHF=X;EURCHF=;
+Or (once);Matières premières;GC=F;@GC.1;
+Argent (once);Matières premières;SI=F;@SI.1;
+Pétrole Brent;Matières premières;BZ=F;@LCO.1;
